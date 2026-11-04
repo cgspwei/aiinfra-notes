@@ -433,7 +433,7 @@ html[data-theme="shadcn"] .am-kv { border-color: var(--line); border-radius: var
 <header class="am-head"><h1>vLLM 架构总览</h1><p class="am-sub">从 HTTP 请求到 GPU 核函数的完整链路</p><div class="am-head-meta"><span><b>source</b>vllm-project/vllm @ main</span></div><div class="am-intro am-md"><div class="am-md"><p>vLLM 的架构分四层：入口层、引擎编排层、引擎核心层、执行与模型层。V1 把调度放进独立进程，把前向计算放进每卡一个的 Worker 进程。本文按数据流从上往下拆。</p>
 </div></div></header>
 <div class="am-doc-layout">
-<nav class="am-toc" aria-label="目录"><a href="#panel-A">A · 设计目标</a><a href="#panel-B">B · 分层总览</a><a href="#panel-C">C · 进程架构</a><a href="#panel-D">D · 调度器</a><a href="#panel-E">E · KV cache 管理</a><a href="#panel-F">F · 执行层</a><a href="#panel-G">G · 模型与算子</a><a href="#panel-H">H · 编译与 CUDA Graph</a><a href="#panel-I">I · 一次请求的旅程</a><a href="#panel-J">J · 并行与加速子系统</a><a href="#panel-K">K · 代码地图</a><a href="#panel-L">L · 阅读路径</a></nav><div class="am-doc-body">
+<nav class="am-toc" aria-label="目录"><a href="#panel-A">A · 设计目标</a><a href="#panel-B">B · 分层总览</a><a href="#panel-C">C · 进程架构</a><a href="#panel-D">D · 部署形态一：单机多卡</a><a href="#panel-E">E · 部署形态二：多机张量并行</a><a href="#panel-F">F · 部署形态三：数据并行</a><a href="#panel-G">G · 部署形态四：分离式服务</a><a href="#panel-H">H · 调度器</a><a href="#panel-I">I · KV cache 管理</a><a href="#panel-J">J · 执行层</a><a href="#panel-K">K · 模型与算子</a><a href="#panel-L">L · 编译与 CUDA Graph</a><a href="#panel-M">M · 一次请求的旅程</a><a href="#panel-N">N · 并行与加速子系统</a><a href="#panel-O">O · 代码地图</a><a href="#panel-P">P · 阅读路径</a></nav><div class="am-doc-body">
 <section class="am-panel" id="panel-A">
 <header class="am-panel-head"><span class="am-panel-id">A</span><h2>设计目标</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>vLLM 用三件事换吞吐：连续批处理、分页 KV cache、多进程解耦。</p>
@@ -469,13 +469,97 @@ html[data-theme="shadcn"] .am-kv { border-color: var(--line); border-radius: var
 <header class="am-panel-head"><span class="am-panel-id">B</span><h2>分层总览</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>控制面自上而下。入口层不碰 GPU，Worker 不碰 HTTP。</p>
 </div>
-<figure class="am-diagram am-flow"><svg viewBox="0 0 263 756" width="263" height="756" role="img" aria-label="流程图：客户端、入口层、编排层、EngineCore、Scheduler、Executor、KVManager、Worker" xmlns="http://www.w3.org/2000/svg"><defs><marker id="am1-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs><g></g><g><path class="am-edge" d="M139,49 L139,65 Q139,81 139,97 L139,113" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="71.5" y="72" width="135.1" height="18" rx="3"/><text x="139" y="81" text-anchor="middle" dominant-baseline="central">HTTP / Python / gRPC</text></g><path class="am-edge" d="M139,148 L139,164 Q139,180 139,196 L139,212" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="66.4" y="171" width="145.2" height="18" rx="3"/><text x="139" y="180" text-anchor="middle" dominant-baseline="central">AsyncLLM / LLMEngine</text></g><path class="am-edge" d="M139,247 L139,263 Q139,279 139,295 L139,311" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="84" y="270" width="110.1" height="18" rx="3"/><text x="139" y="279" text-anchor="middle" dominant-baseline="central">ZMQ 或进程内调用</text></g><path class="am-edge" d="M160.4,346 L180,362 Q199.6,378 199.6,394 L199.6,410" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="171.6" y="369" width="56" height="18" rx="3"/><text x="199.6" y="378" text-anchor="middle" dominant-baseline="central">每步组批</text></g><path class="am-edge" d="M117.6,346 L98,362 Q78.4,378 78.4,394 L78.4,410" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="15" y="369" width="126.8" height="18" rx="3"/><text x="78.4" y="378" text-anchor="middle" dominant-baseline="central">下发 SchedulerOutput</text></g><path class="am-edge" d="M199.6,445 L199.6,461 Q199.6,477 199.6,493 L199.6,509" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="166.7" y="468" width="65.9" height="18" rx="3"/><text x="199.6" y="477" text-anchor="middle" dominant-baseline="central">分配 block</text></g><path class="am-edge" d="M78.4,445 L78.4,461 Q78.4,477 78.4,493 L78.4,509" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="35.2" y="468" width="86.4" height="18" rx="3"/><text x="78.4" y="477" text-anchor="middle" dominant-baseline="central">collective_rpc</text></g><path class="am-edge" d="M78.4,544 L78.4,560 Q78.4,576 78.4,592 L78.4,608" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="50.4" y="567" width="56" height="18" rx="3"/><text x="78.4" y="576" text-anchor="middle" dominant-baseline="central">准备输入</text></g><path class="am-edge" d="M78.4,643 L78.4,659 Q78.4,675 78.4,691 L78.4,707" marker-end="url(#am1-arrow)"/><g class="am-edge-label"><rect x="53.3" y="666" width="50.3" height="18" rx="3"/><text x="78.4" y="675" text-anchor="middle" dominant-baseline="central">forward</text></g></g><g><g class="am-node am-node--round"><rect class="am-node-shape" x="99.5" y="14" width="79" height="35" rx="17.5"/><text x="139" y="31.5" text-anchor="middle" dominant-baseline="central">客户端</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="105.5" y="113" width="67" height="35" rx="3"/><text x="139" y="130.5" text-anchor="middle" dominant-baseline="central">入口层</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="105.5" y="212" width="67" height="35" rx="3"/><text x="139" y="229.5" text-anchor="middle" dominant-baseline="central">编排层</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="90.2" y="311" width="97.7" height="35" rx="3"/><text x="139" y="328.5" text-anchor="middle" dominant-baseline="central">EngineCore</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="155.2" y="410" width="88.8" height="35" rx="3"/><text x="199.6" y="427.5" text-anchor="middle" dominant-baseline="central">Scheduler</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="37.6" y="410" width="81.6" height="35" rx="3"/><text x="78.4" y="427.5" text-anchor="middle" dominant-baseline="central">Executor</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="150.9" y="509" width="97.4" height="35" rx="3"/><text x="199.6" y="526.5" text-anchor="middle" dominant-baseline="central">KVManager</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="43.8" y="509" width="69.3" height="35" rx="3"/><text x="78.4" y="526.5" text-anchor="middle" dominant-baseline="central">Worker</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="24.8" y="608" width="107.3" height="35" rx="3"/><text x="78.4" y="625.5" text-anchor="middle" dominant-baseline="central">ModelRunner</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="25.4" y="707" width="106" height="35" rx="3"/><text x="78.4" y="724.5" text-anchor="middle" dominant-baseline="central">模型与Kernel</text></g></g></svg></figure></div>
+<svg viewBox="0 0 960 470" role="img" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">
+  <defs>
+    <filter id="shL" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/>
+    </marker>
+  </defs>
+
+  <g filter="url(#shL)">
+    <rect x="190" y="22" width="560" height="56" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="190" y="112" width="560" height="56" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="190" y="202" width="560" height="56" rx="10" fill="var(--ok-bg)" stroke="var(--ok)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="190" y="292" width="560" height="56" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="190" y="382" width="560" height="56" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/>
+  </g>
+  <g style="font-family:var(--font-sans)">
+    <text x="212" y="46" style="font-size:13px;font-weight:600;fill:var(--ink)">入口层</text>
+    <text x="212" y="64" style="font-size:10.5px;fill:var(--ink-2)">HTTP · Python · gRPC · OpenAI 兼容接口</text>
+    <text x="212" y="136" style="font-size:13px;font-weight:600;fill:var(--ink)">引擎编排层</text>
+    <text x="212" y="154" style="font-size:10.5px;fill:var(--ink-2)">AsyncLLM / LLMEngine · 请求生命周期 · 流式输出</text>
+    <text x="212" y="226" style="font-size:13px;font-weight:600;fill:var(--ink)">引擎核心层</text>
+    <text x="212" y="244" style="font-size:10.5px;fill:var(--ink-2)">EngineCore · Scheduler · KVCacheManager · Executor</text>
+    <text x="212" y="316" style="font-size:13px;font-weight:600;fill:var(--ink)">执行层</text>
+    <text x="212" y="334" style="font-size:10.5px;fill:var(--ink-2)">Worker × N · 每 GPU 一个进程 · ModelRunner</text>
+    <text x="212" y="406" style="font-size:13px;font-weight:600;fill:var(--ink)">模型与 Kernel</text>
+    <text x="212" y="424" style="font-size:10.5px;fill:var(--ink-2)">nn.Module · FlashAttention · CUTLASS / Triton</text>
+  </g>
+
+  <g fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-opacity=".75">
+    <path d="M470,78 V112" marker-end="url(#arL)"/>
+    <path d="M470,168 V202" marker-end="url(#arL)"/>
+    <path d="M470,258 V292" marker-end="url(#arL)"/>
+    <path d="M470,348 V382" marker-end="url(#arL)"/>
+  </g>
+  <g style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)">
+    <text x="484" y="99">HTTP 请求 / 流式响应</text>
+    <text x="484" y="189">ZMQ 或进程内调用</text>
+    <text x="484" y="279">collective_rpc</text>
+    <text x="484" y="369">forward / sample</text>
+  </g>
+</svg></div>
 </section>
 <section class="am-panel" id="panel-C">
 <header class="am-panel-head"><span class="am-panel-id">C</span><h2>进程架构</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>V1 按职责切进程。每个进程只做一类事。</p>
 </div>
-<figure class="am-diagram am-flow"><svg viewBox="0 0 888 63" width="888" height="63" role="img" aria-label="流程图：客户端、API Server、Engine Core、GPU Worker、GPU" xmlns="http://www.w3.org/2000/svg"><defs><marker id="am2-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs><g></g><g><path class="am-edge" d="M93,31.5 L124.5,31.5 Q156,31.5 187.6,31.5 L219.1,31.5" marker-end="url(#am2-arrow)"/><g class="am-edge-label"><rect x="117" y="22.5" width="78.1" height="18" rx="3"/><text x="156" y="31.5" text-anchor="middle" dominant-baseline="central">HTTP / SSE</text></g><path class="am-edge" d="M311.8,31.5 L333.2,31.5 Q354.6,31.5 376,31.5 L397.4,31.5" marker-end="url(#am2-arrow)"/><g class="am-edge-label"><rect x="335.8" y="22.5" width="37.6" height="18" rx="3"/><text x="354.6" y="31.5" text-anchor="middle" dominant-baseline="central">ZMQ</text></g><path class="am-edge" d="M499,31.5 L530.8,31.5 Q562.5,31.5 594.3,31.5 L626,31.5" marker-end="url(#am2-arrow)"/><g class="am-edge-label"><rect x="523" y="22.5" width="79" height="18" rx="3"/><text x="562.5" y="31.5" text-anchor="middle" dominant-baseline="central">共享内存队列</text></g><path class="am-edge" d="M728.1,31.5 L748.3,31.5 Q768.6,31.5 788.9,31.5 L809.1,31.5" marker-end="url(#am2-arrow)"/><g class="am-edge-label"><rect x="752.1" y="22.5" width="33" height="18" rx="3"/><text x="768.6" y="31.5" text-anchor="middle" dominant-baseline="central">前向</text></g></g><g><g class="am-node am-node--round"><rect class="am-node-shape" x="14" y="14" width="79" height="35" rx="17.5"/><text x="53.5" y="31.5" text-anchor="middle" dominant-baseline="central">客户端</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="219.1" y="14" width="92.7" height="35" rx="3"/><text x="265.5" y="31.5" text-anchor="middle" dominant-baseline="central">API Server</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="397.4" y="14" width="101.6" height="35" rx="3"/><text x="448.2" y="31.5" text-anchor="middle" dominant-baseline="central">Engine Core</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="626" y="14" width="102.1" height="35" rx="3"/><text x="677.1" y="31.5" text-anchor="middle" dominant-baseline="central">GPU Worker</text></g><g class="am-node am-node--rect"><rect class="am-node-shape" x="809.1" y="14" width="64" height="35" rx="3"/><text x="841.1" y="31.5" text-anchor="middle" dominant-baseline="central">GPU</text></g></g></svg></figure>
+<svg viewBox="0 0 960 180" role="img" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">
+  <defs>
+    <filter id="shP" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/>
+    </marker>
+  </defs>
+
+  <g filter="url(#shP)">
+    <rect x="30" y="64" width="120" height="60" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="200" y="64" width="150" height="60" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="400" y="64" width="150" height="60" rx="10" fill="var(--ok-bg)" stroke="var(--ok)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="600" y="64" width="150" height="60" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="800" y="64" width="120" height="60" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/>
+  </g>
+  <g style="font-family:var(--font-sans)">
+    <text x="48" y="90" style="font-size:13px;font-weight:600;fill:var(--ink)">客户端</text>
+    <text x="48" y="108" style="font-size:10.5px;fill:var(--ink-2)">HTTP 请求</text>
+    <text x="218" y="90" style="font-size:13px;font-weight:600;fill:var(--ink)">API Server</text>
+    <text x="218" y="108" style="font-size:10.5px;fill:var(--ink-2)">分词 · 流式</text>
+    <text x="418" y="90" style="font-size:13px;font-weight:600;fill:var(--ink)">Engine Core</text>
+    <text x="418" y="108" style="font-size:10.5px;fill:var(--ink-2)">调度 · KV cache</text>
+    <text x="618" y="90" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU Worker</text>
+    <text x="618" y="108" style="font-size:10.5px;fill:var(--ink-2)">每卡一个进程</text>
+    <text x="818" y="90" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU</text>
+    <text x="818" y="108" style="font-size:10.5px;fill:var(--ink-2)">显存 · 算力</text>
+  </g>
+
+  <g fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-opacity=".75">
+    <path d="M150,94 H200" marker-end="url(#arP)"/>
+    <path d="M350,94 H400" marker-end="url(#arP)"/>
+    <path d="M550,94 H600" marker-end="url(#arP)"/>
+    <path d="M750,94 H800" marker-end="url(#arP)"/>
+  </g>
+  <g style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)" text-anchor="middle">
+    <text x="175" y="84">HTTP / SSE</text>
+    <text x="375" y="84">ZMQ</text>
+    <text x="575" y="84">共享内存</text>
+    <text x="775" y="84">前向</text>
+  </g>
+</svg>
 <div class="am-md"><div class="am-table-wrap"><table>
 <thead>
 <tr>
@@ -513,11 +597,378 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 </div></div>
 </section>
 <section class="am-panel" id="panel-D">
-<header class="am-panel-head"><span class="am-panel-id">D</span><h2>调度器</h2></header>
+<header class="am-panel-head"><span class="am-panel-id">D</span><h2>部署形态一：单机多卡</h2></header>
+<div class="am-panel-body"><div class="am-md"><p>最常见的形态。所有进程在同一台机器，用默认 <code>mp</code> 后端。</p>
+</div>
+<svg viewBox="0 0 960 340" role="img" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">
+  <defs>
+    <filter id="shA" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/>
+    </marker>
+  </defs>
+
+  <rect x="28" y="18" width="904" height="304" rx="16" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="7 6"/>
+  <text x="48" y="44" style="font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em">单节点 · 4 × GPU</text>
+
+  <g style="font-family:var(--font-sans)" fill="var(--ink-3)" font-size="10.5">
+    <circle cx="612" cy="38" r="4" fill="var(--accent)"/><text x="622" y="42">入口</text>
+    <circle cx="676" cy="38" r="4" fill="var(--ok)"/><text x="686" y="42">引擎</text>
+    <circle cx="740" cy="38" r="4" fill="var(--warn)"/><text x="750" y="42">Worker</text>
+    <circle cx="818" cy="38" r="4" fill="var(--ink-3)"/><text x="828" y="42">GPU</text>
+  </g>
+
+  <g filter="url(#shA)">
+    <rect x="55" y="138" width="150" height="66" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <text x="73" y="166" style="font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)">API Server</text>
+  <text x="73" y="186" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)">HTTP / 分词 / 流式</text>
+
+  <g filter="url(#shA)">
+    <rect x="265" y="138" width="160" height="66" rx="10" fill="var(--ok-bg)" stroke="var(--ok)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <text x="283" y="166" style="font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)">Engine Core</text>
+  <text x="283" y="186" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)">调度 + KV cache</text>
+
+  <g style="font-family:var(--font-sans)">
+    <g filter="url(#shA)"><rect x="500" y="56" width="150" height="48" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/></g>
+    <text x="518" y="76" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 0</text>
+    <text x="518" y="92" style="font-size:10.5px;fill:var(--ink-2)">绑定 GPU 0</text>
+    <g filter="url(#shA)"><rect x="500" y="120" width="150" height="48" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/></g>
+    <text x="518" y="140" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 1</text>
+    <text x="518" y="156" style="font-size:10.5px;fill:var(--ink-2)">绑定 GPU 1</text>
+    <g filter="url(#shA)"><rect x="500" y="184" width="150" height="48" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/></g>
+    <text x="518" y="204" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 2</text>
+    <text x="518" y="220" style="font-size:10.5px;fill:var(--ink-2)">绑定 GPU 2</text>
+    <g filter="url(#shA)"><rect x="500" y="248" width="150" height="48" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/></g>
+    <text x="518" y="268" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 3</text>
+    <text x="518" y="284" style="font-size:10.5px;fill:var(--ink-2)">绑定 GPU 3</text>
+
+    <g filter="url(#shA)"><rect x="730" y="56" width="120" height="48" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/></g>
+    <text x="748" y="76" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU 0</text>
+    <text x="748" y="92" style="font-size:10.5px;fill:var(--ink-2)">80 GB</text>
+    <g filter="url(#shA)"><rect x="730" y="120" width="120" height="48" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/></g>
+    <text x="748" y="140" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU 1</text>
+    <text x="748" y="156" style="font-size:10.5px;fill:var(--ink-2)">80 GB</text>
+    <g filter="url(#shA)"><rect x="730" y="184" width="120" height="48" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/></g>
+    <text x="748" y="204" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU 2</text>
+    <text x="748" y="220" style="font-size:10.5px;fill:var(--ink-2)">80 GB</text>
+    <g filter="url(#shA)"><rect x="730" y="248" width="120" height="48" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/></g>
+    <text x="748" y="268" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU 3</text>
+    <text x="748" y="284" style="font-size:10.5px;fill:var(--ink-2)">80 GB</text>
+  </g>
+
+  <g fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-opacity=".75">
+    <path d="M205,171 H265" marker-end="url(#arA)"/>
+    <path d="M425,171 H462"/>
+    <path d="M462,80 V272"/>
+    <path d="M462,80 H500" marker-end="url(#arA)"/>
+    <path d="M462,144 H500" marker-end="url(#arA)"/>
+    <path d="M462,208 H500" marker-end="url(#arA)"/>
+    <path d="M462,272 H500" marker-end="url(#arA)"/>
+    <path d="M650,80 H730" marker-end="url(#arA)"/>
+    <path d="M650,144 H730" marker-end="url(#arA)"/>
+    <path d="M650,208 H730" marker-end="url(#arA)"/>
+    <path d="M650,272 H730" marker-end="url(#arA)"/>
+  </g>
+  <text x="220" y="163" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)">ZMQ</text>
+</svg>
+<div class="am-md"><div class="am-table-wrap"><table>
+<thead>
+<tr>
+<th>条件</th>
+<th>后端</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TP × PP ≤ 本机 GPU 数</td>
+<td><code>mp</code>，默认</td>
+</tr>
+<tr>
+<td>只有一张卡</td>
+<td><code>uni</code>，单进程</td>
+</tr>
+</tbody></table></div>
+<p>KV cache 和激活值都不出机器。启动命令只有一行：<code>vllm serve &lt;model&gt; -tp=4</code>。</p>
+</div></div>
+</section>
+<section class="am-panel" id="panel-E">
+<header class="am-panel-head"><span class="am-panel-id">E</span><h2>部署形态二：多机张量并行</h2></header>
+<div class="am-panel-body"><div class="am-md"><p>Head 节点跑 API Server 和 Engine Core，Worker 分布到多台机器。</p>
+</div>
+<svg viewBox="0 0 960 400" role="img" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">
+  <defs>
+    <filter id="shB" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/>
+    </marker>
+  </defs>
+
+  <rect x="28" y="12" width="904" height="140" rx="16" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="7 6"/>
+  <text x="48" y="38" style="font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em">节点 0（Head）</text>
+
+  <g filter="url(#shB)">
+    <rect x="55" y="58" width="140" height="52" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="225" y="58" width="150" height="52" rx="10" fill="var(--ok-bg)" stroke="var(--ok)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="430" y="58" width="150" height="52" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="620" y="58" width="150" height="52" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <g style="font-family:var(--font-sans)">
+    <text x="73" y="80" style="font-size:13px;font-weight:600;fill:var(--ink)">API Server</text>
+    <text x="73" y="97" style="font-size:10.5px;fill:var(--ink-2)">HTTP / 分词</text>
+    <text x="243" y="80" style="font-size:13px;font-weight:600;fill:var(--ink)">Engine Core</text>
+    <text x="243" y="97" style="font-size:10.5px;fill:var(--ink-2)">调度 + KV cache</text>
+    <text x="448" y="80" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 0</text>
+    <text x="448" y="97" style="font-size:10.5px;fill:var(--ink-2)">GPU 0</text>
+    <text x="638" y="80" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 1</text>
+    <text x="638" y="97" style="font-size:10.5px;fill:var(--ink-2)">GPU 1</text>
+  </g>
+
+  <rect x="28" y="190" width="904" height="140" rx="16" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="7 6"/>
+  <text x="48" y="216" style="font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em">节点 1</text>
+  <text x="60" y="266" style="font-family:var(--font-sans);font-size:11px;fill:var(--ink-3)">其余节点同构</text>
+
+  <g filter="url(#shB)">
+    <rect x="430" y="236" width="150" height="52" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="620" y="236" width="150" height="52" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <g style="font-family:var(--font-sans)">
+    <text x="448" y="258" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 2</text>
+    <text x="448" y="275" style="font-size:10.5px;fill:var(--ink-2)">GPU 2</text>
+    <text x="638" y="258" style="font-size:13px;font-weight:600;fill:var(--ink)">Worker 3</text>
+    <text x="638" y="275" style="font-size:10.5px;fill:var(--ink-2)">GPU 3</text>
+  </g>
+
+  <g fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-opacity=".75">
+    <path d="M195,84 H225" marker-end="url(#arB)"/>
+    <path d="M375,84 H430" marker-end="url(#arB)"/>
+    <path d="M375,84 H400 V44 H695 V58" marker-end="url(#arB)"/>
+    <path d="M300,110 V165" stroke-dasharray="5 4"/>
+    <path d="M300,165 H505 V236" stroke-dasharray="5 4" marker-end="url(#arB)"/>
+    <path d="M300,165 H695 V236" stroke-dasharray="5 4" marker-end="url(#arB)"/>
+  </g>
+  <rect x="438" y="146" width="104" height="18" rx="4" fill="var(--paper)"/>
+  <text x="490" y="159" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)" text-anchor="middle">IB / 以太网</text>
+  <text x="212" y="76" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)">ZMQ</text>
+</svg>
+<div class="am-md"><p>两种拉起方式：</p>
+<div class="am-table-wrap"><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>做法</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mp</code></td>
+<td>每台机器起一个 <code>vllm serve</code>，设 <code>--nnodes</code>、<code>--node-rank</code>、<code>--master-addr</code>、<code>--master-port</code></td>
+<td>无 Ray 集群，参数最轻</td>
+</tr>
+<tr>
+<td><code>ray</code></td>
+<td><code>--distributed-executor-backend ray</code>，由 Ray 调度 Worker</td>
+<td>已有 Ray 集群</td>
+</tr>
+</tbody></table></div>
+<p>节点内走 NVLink，节点间走 InfiniBand 或高速以太网。TP 每层都要 all-reduce，跨节点延迟很敏感。PP 只传激活值，跨节点更划算。</p>
+</div></div>
+</section>
+<section class="am-panel" id="panel-F">
+<header class="am-panel-head"><span class="am-panel-id">F</span><h2>部署形态三：数据并行</h2></header>
+<div class="am-panel-body"><div class="am-md"><p>DP 复制完整模型。每个 DP rank 有自己的 Engine Core 和 KV cache。</p>
+</div>
+<svg viewBox="0 0 960 420" role="img" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">
+  <defs>
+    <filter id="shC" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/>
+    </marker>
+  </defs>
+
+  <g filter="url(#shC)">
+    <rect x="390" y="14" width="180" height="54" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <text x="480" y="38" style="font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)" text-anchor="middle">负载均衡</text>
+  <text x="480" y="54" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)" text-anchor="middle">外部 LB 或 DP 路由</text>
+
+  <rect x="40" y="96" width="420" height="280" rx="16" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="7 6"/>
+  <text x="60" y="122" style="font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em">DP rank 0 · TP=2</text>
+  <rect x="500" y="96" width="420" height="280" rx="16" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="7 6"/>
+  <text x="520" y="122" style="font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em">DP rank 1 · TP=2</text>
+
+  <g filter="url(#shC)">
+    <rect x="70" y="140" width="150" height="48" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="530" y="140" width="150" height="48" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="70" y="240" width="150" height="48" rx="10" fill="var(--ok-bg)" stroke="var(--ok)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="530" y="240" width="150" height="48" rx="10" fill="var(--ok-bg)" stroke="var(--ok)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <g style="font-family:var(--font-sans)">
+    <text x="88" y="164" style="font-size:13px;font-weight:600;fill:var(--ink)">API Server 0</text>
+    <text x="88" y="180" style="font-size:10.5px;fill:var(--ink-2)">HTTP / 分词</text>
+    <text x="548" y="164" style="font-size:13px;font-weight:600;fill:var(--ink)">API Server 1</text>
+    <text x="548" y="180" style="font-size:10.5px;fill:var(--ink-2)">HTTP / 分词</text>
+    <text x="88" y="264" style="font-size:13px;font-weight:600;fill:var(--ink)">Engine Core 0</text>
+    <text x="88" y="280" style="font-size:10.5px;fill:var(--ink-2)">调度 + KV cache</text>
+    <text x="548" y="264" style="font-size:13px;font-weight:600;fill:var(--ink)">Engine Core 1</text>
+    <text x="548" y="280" style="font-size:10.5px;fill:var(--ink-2)">调度 + KV cache</text>
+  </g>
+
+  <g filter="url(#shC)">
+    <rect x="70" y="316" width="150" height="48" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/>
+    <rect x="530" y="316" width="150" height="48" rx="10" fill="var(--fill)" stroke="var(--line)" stroke-width="1.2"/>
+  </g>
+  <g style="font-family:var(--font-sans)">
+    <text x="88" y="340" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU 组 0</text>
+    <text x="88" y="356" style="font-size:10.5px;fill:var(--ink-2)">GPU 0 / 1 · 独立 KV</text>
+    <text x="548" y="340" style="font-size:13px;font-weight:600;fill:var(--ink)">GPU 组 1</text>
+    <text x="548" y="356" style="font-size:10.5px;fill:var(--ink-2)">GPU 2 / 3 · 独立 KV</text>
+  </g>
+
+  <line x1="70" y1="214" x2="890" y2="214" stroke="var(--accent)" stroke-width="1.5" stroke-opacity=".45" stroke-dasharray="3 4"/>
+  <rect x="424" y="196" width="112" height="18" rx="4" fill="var(--paper)"/>
+  <text x="480" y="209" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)" text-anchor="middle">ZMQ 多对多</text>
+
+  <g fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-opacity=".75">
+    <path d="M480,68 V88 H145 V140" marker-end="url(#arC)"/>
+    <path d="M480,68 V88 H605 V140" marker-end="url(#arC)"/>
+    <path d="M145,188 V240"/>
+    <path d="M605,188 V240"/>
+    <path d="M145,288 V316" marker-end="url(#arC)"/>
+    <path d="M605,288 V316" marker-end="url(#arC)"/>
+  </g>
+  <text x="60" y="404" style="font-family:var(--font-sans);font-size:11px;fill:var(--ink-3)">DP &gt; 1 时另有 1 个 DP Coordinator 进程，负责跨 rank 均衡与同步。</text>
+</svg>
+<div class="am-md"><div class="am-table-wrap"><table>
+<thead>
+<tr>
+<th>特性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>请求路由</td>
+<td>外部负载均衡，或 DP Coordinator 内部均衡</td>
+</tr>
+<tr>
+<td>API Server 数量</td>
+<td>默认等于 DP，可用 <code>--api-server-count</code> 调整</td>
+</tr>
+<tr>
+<td>适合场景</td>
+<td>单模型放得下，要更高总吞吐</td>
+</tr>
+<tr>
+<td>不适合</td>
+<td>单请求需要跨卡低延迟</td>
+</tr>
+</tbody></table></div>
+<p>DP 与 EP 可以叠加：数据并行复制注意力，专家并行切分 MoE。</p>
+</div></div>
+</section>
+<section class="am-panel" id="panel-G">
+<header class="am-panel-head"><span class="am-panel-id">G</span><h2>部署形态四：分离式服务</h2></header>
+<div class="am-panel-body"><div class="am-md"><p>Prefill、Decode、Encode 拆成独立实例池，按阶段配资源。</p>
+</div>
+<svg viewBox="0 0 960 360" role="img" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">
+  <defs>
+    <filter id="shD" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/>
+    </marker>
+    <marker id="arAccD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+    </marker>
+  </defs>
+
+  <g filter="url(#shD)">
+    <rect x="380" y="14" width="200" height="50" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="380" y="92" width="200" height="50" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <text x="480" y="38" style="font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)" text-anchor="middle">客户端</text>
+  <text x="480" y="54" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)" text-anchor="middle">OpenAI / SDK</text>
+  <text x="480" y="116" style="font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)" text-anchor="middle">路由 / 调度器</text>
+  <text x="480" y="132" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)" text-anchor="middle">按阶段转发</text>
+
+  <rect x="100" y="180" width="340" height="120" rx="16" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="7 6"/>
+  <text x="120" y="206" style="font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em">Prefill 池 · 算力密集</text>
+  <rect x="520" y="180" width="340" height="120" rx="16" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="7 6"/>
+  <text x="540" y="206" style="font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em">Decode 池 · 显存密集</text>
+
+  <g filter="url(#shD)">
+    <rect x="120" y="228" width="140" height="54" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="280" y="228" width="140" height="54" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="540" y="228" width="140" height="54" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+    <rect x="700" y="228" width="140" height="54" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" stroke-opacity=".35" stroke-width="1.2"/>
+  </g>
+  <g style="font-family:var(--font-sans)">
+    <text x="138" y="252" style="font-size:13px;font-weight:600;fill:var(--ink)">Prefill 0</text>
+    <text x="138" y="270" style="font-size:10.5px;fill:var(--ink-2)">长 prompt</text>
+    <text x="298" y="252" style="font-size:13px;font-weight:600;fill:var(--ink)">Prefill 1</text>
+    <text x="298" y="270" style="font-size:10.5px;fill:var(--ink-2)">长 prompt</text>
+    <text x="558" y="252" style="font-size:13px;font-weight:600;fill:var(--ink)">Decode 0</text>
+    <text x="558" y="270" style="font-size:10.5px;fill:var(--ink-2)">逐 token</text>
+    <text x="718" y="252" style="font-size:13px;font-weight:600;fill:var(--ink)">Decode 1</text>
+    <text x="718" y="270" style="font-size:10.5px;fill:var(--ink-2)">逐 token</text>
+  </g>
+
+  <g fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-opacity=".75">
+    <path d="M430,142 V164 H190 V228" marker-end="url(#arD)"/>
+    <path d="M530,142 V164 H770 V228" marker-end="url(#arD)"/>
+    <path d="M840,255 H900 V39 H580" stroke-dasharray="5 4" marker-end="url(#arD)"/>
+  </g>
+  <path d="M440,255 H520" fill="none" stroke="var(--accent)" stroke-width="3" marker-end="url(#arAccD)"/>
+  <rect x="436" y="146" width="90" height="17" rx="4" fill="var(--paper)"/>
+  <text x="481" y="158" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)" text-anchor="middle">首 token</text>
+  <rect x="698" y="146" width="56" height="17" rx="4" fill="var(--paper)"/>
+  <text x="726" y="158" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)" text-anchor="middle">续写</text>
+  <rect x="438" y="266" width="86" height="17" rx="4" fill="var(--paper)"/>
+  <text x="481" y="278" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)" text-anchor="middle">KV Connector</text>
+  <rect x="812" y="112" width="82" height="17" rx="4" fill="var(--paper)"/>
+  <text x="853" y="124" style="font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)" text-anchor="middle">SSE 流式</text>
+  <text x="100" y="352" style="font-family:var(--font-sans);font-size:11px;fill:var(--ink-3)">多模态可再加 Encode 池，编码结果经 encoder cache 交给 Prefill。</text>
+</svg>
+<div class="am-md"><div class="am-table-wrap"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>特点</th>
+<th>资源倾向</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Prefill</td>
+<td>算力密集，处理长 prompt</td>
+<td>高算力，短时占用</td>
+</tr>
+<tr>
+<td>Decode</td>
+<td>显存带宽密集，逐 token</td>
+<td>大显存，长时占用</td>
+</tr>
+<tr>
+<td>Encode</td>
+<td>多模态编码，可独立扩缩</td>
+<td>按图像负载弹性</td>
+</tr>
+</tbody></table></div>
+<p>好处是 TTFT 和 TPOT 可以分开优化。代价是 KV 跨实例传输，多一个故障域。多模态还可以把 Encode 再拆出去，走独立的 encoder 传输通道。</p>
+</div></div>
+</section>
+<section class="am-panel" id="panel-H">
+<header class="am-panel-head"><span class="am-panel-id">H</span><h2>调度器</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>调度器在 Engine Core 进程内。它是 token 预算制：每步把 <code>max_num_batched_tokens</code> 填满。</p>
 <p>没有独立的 prefill 阶段和 decode 阶段。每个请求记录已算 token 数，调度器补差额。一个循环同时覆盖 chunked prefill、前缀缓存和投机解码。</p>
 </div>
-<figure class="am-diagram am-seq"><svg viewBox="0 0 810 424" width="810" height="424" role="img" aria-label="时序图：Scheduler、KVManager、Executor、Worker、ModelRunner、EngineCore" xmlns="http://www.w3.org/2000/svg"><defs><marker id="am3-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs><line class="am-lifeline" x1="56.4" y1="42" x2="56.4" y2="420"/><rect class="am-actor" x="12" y="8" width="88.8" height="34" rx="2"/><text x="56.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Scheduler</text><line class="am-lifeline" x1="177.6" y1="42" x2="177.6" y2="420"/><rect class="am-actor" x="128.8" y="8" width="97.4" height="34" rx="2"/><text x="177.6" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">KVManager</text><line class="am-lifeline" x1="296.3" y1="42" x2="296.3" y2="420"/><rect class="am-actor" x="254.3" y="8" width="84" height="34" rx="2"/><text x="296.3" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Executor</text><line class="am-lifeline" x1="438.9" y1="42" x2="438.9" y2="420"/><rect class="am-actor" x="396.9" y="8" width="84" height="34" rx="2"/><text x="438.9" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Worker</text><line class="am-lifeline" x1="618.2" y1="42" x2="618.2" y2="420"/><rect class="am-actor" x="564.6" y="8" width="107.3" height="34" rx="2"/><text x="618.2" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">ModelRunner</text><line class="am-lifeline" x1="748.7" y1="42" x2="748.7" y2="420"/><rect class="am-actor" x="699.9" y="8" width="97.7" height="34" rx="2"/><text x="748.7" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">EngineCore</text><line class="am-lifeline" x1="12" y1="74" x2="797.5" y2="74"/><rect class="am-actor" x="344.8" y="64" width="119.8" height="20" rx="2"/><text x="404.8" y="74" text-anchor="middle" dominant-baseline="central" font-size="12">EngineCore.step()</text><text x="117" y="104" text-anchor="middle">allocate_slots</text><path class="am-edge" d="M56.4,114 L175.6,114" marker-end="url(#am3-arrow)"/><text x="176.3" y="144" text-anchor="middle">SchedulerOutput</text><path class="am-edge" d="M56.4,154 L294.3,154" marker-end="url(#am3-arrow)"/><text x="367.6" y="184" text-anchor="middle">execute_model</text><path class="am-edge" d="M296.3,194 L436.9,194" marker-end="url(#am3-arrow)"/><text x="528.6" y="224" text-anchor="middle">_prepare_inputs + forward</text><path class="am-edge" d="M438.9,234 L616.2,234" marker-end="url(#am3-arrow)"/><text x="528.6" y="264" text-anchor="middle">logits</text><path class="am-edge am-edge--dashed" d="M618.2,274 L440.9,274" marker-end="url(#am3-arrow)"/><text x="367.6" y="304" text-anchor="middle">ModelRunnerOutput</text><path class="am-edge am-edge--dashed" d="M438.9,314 L298.3,314" marker-end="url(#am3-arrow)"/><text x="176.3" y="344" text-anchor="middle">update_from_output</text><path class="am-edge am-edge--dashed" d="M296.3,354 L58.4,354" marker-end="url(#am3-arrow)"/><text x="402.6" y="384" text-anchor="middle">EngineCoreOutputs</text><path class="am-edge am-edge--dashed" d="M56.4,394 L746.7,394" marker-end="url(#am3-arrow)"/></svg></figure>
+<figure class="am-diagram am-seq"><svg viewBox="0 0 810 424" width="810" height="424" role="img" aria-label="时序图：Scheduler、KVManager、Executor、Worker、ModelRunner、EngineCore" xmlns="http://www.w3.org/2000/svg"><defs><marker id="am1-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs><line class="am-lifeline" x1="56.4" y1="42" x2="56.4" y2="420"/><rect class="am-actor" x="12" y="8" width="88.8" height="34" rx="2"/><text x="56.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Scheduler</text><line class="am-lifeline" x1="177.6" y1="42" x2="177.6" y2="420"/><rect class="am-actor" x="128.8" y="8" width="97.4" height="34" rx="2"/><text x="177.6" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">KVManager</text><line class="am-lifeline" x1="296.3" y1="42" x2="296.3" y2="420"/><rect class="am-actor" x="254.3" y="8" width="84" height="34" rx="2"/><text x="296.3" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Executor</text><line class="am-lifeline" x1="438.9" y1="42" x2="438.9" y2="420"/><rect class="am-actor" x="396.9" y="8" width="84" height="34" rx="2"/><text x="438.9" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Worker</text><line class="am-lifeline" x1="618.2" y1="42" x2="618.2" y2="420"/><rect class="am-actor" x="564.6" y="8" width="107.3" height="34" rx="2"/><text x="618.2" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">ModelRunner</text><line class="am-lifeline" x1="748.7" y1="42" x2="748.7" y2="420"/><rect class="am-actor" x="699.9" y="8" width="97.7" height="34" rx="2"/><text x="748.7" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">EngineCore</text><line class="am-lifeline" x1="12" y1="74" x2="797.5" y2="74"/><rect class="am-actor" x="344.8" y="64" width="119.8" height="20" rx="2"/><text x="404.8" y="74" text-anchor="middle" dominant-baseline="central" font-size="12">EngineCore.step()</text><text x="117" y="104" text-anchor="middle">allocate_slots</text><path class="am-edge" d="M56.4,114 L175.6,114" marker-end="url(#am1-arrow)"/><text x="176.3" y="144" text-anchor="middle">SchedulerOutput</text><path class="am-edge" d="M56.4,154 L294.3,154" marker-end="url(#am1-arrow)"/><text x="367.6" y="184" text-anchor="middle">execute_model</text><path class="am-edge" d="M296.3,194 L436.9,194" marker-end="url(#am1-arrow)"/><text x="528.6" y="224" text-anchor="middle">_prepare_inputs + forward</text><path class="am-edge" d="M438.9,234 L616.2,234" marker-end="url(#am1-arrow)"/><text x="528.6" y="264" text-anchor="middle">logits</text><path class="am-edge am-edge--dashed" d="M618.2,274 L440.9,274" marker-end="url(#am1-arrow)"/><text x="367.6" y="304" text-anchor="middle">ModelRunnerOutput</text><path class="am-edge am-edge--dashed" d="M438.9,314 L298.3,314" marker-end="url(#am1-arrow)"/><text x="176.3" y="344" text-anchor="middle">update_from_output</text><path class="am-edge am-edge--dashed" d="M296.3,354 L58.4,354" marker-end="url(#am1-arrow)"/><text x="402.6" y="384" text-anchor="middle">EngineCoreOutputs</text><path class="am-edge am-edge--dashed" d="M56.4,394 L746.7,394" marker-end="url(#am1-arrow)"/></svg></figure>
 <div class="am-md"><div class="am-table-wrap"><table>
 <thead>
 <tr>
@@ -555,8 +1006,8 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 <p>两种策略：FCFS（默认）和 priority。KV 不足时，调度器抢占运行中的请求。被抢占的请求丢弃 KV，重新排队，之后从头重算。前缀缓存能恢复一部分进度。</p>
 </div></div>
 </section>
-<section class="am-panel" id="panel-E">
-<header class="am-panel-head"><span class="am-panel-id">E</span><h2>KV cache 管理</h2></header>
+<section class="am-panel" id="panel-I">
+<header class="am-panel-head"><span class="am-panel-id">I</span><h2>KV cache 管理</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>KV cache 按固定大小的 block 管理，默认 16 个 token 一块。BlockPool 持有全部 block 和空闲队列。KVCacheManager 按请求分配和释放。</p>
 <p>前缀缓存的核心是 block hash 链。一个 block 的 hash 由父 block hash 和本块 token 决定。相同前缀的请求自然命中同一批 block。</p>
 <p>vLLM 支持多种 KV cache 组：全注意力、滑动窗口、Mamba 状态、交叉注意力。每组的大小和布局可以不同。多模态请求另有 encoder cache，按 encoder 输出块管理。</p>
@@ -586,8 +1037,8 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 </tbody></table></div>
 </div></div>
 </section>
-<section class="am-panel" id="panel-F">
-<header class="am-panel-head"><span class="am-panel-id">F</span><h2>执行层</h2></header>
+<section class="am-panel" id="panel-J">
+<header class="am-panel-head"><span class="am-panel-id">J</span><h2>执行层</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>Executor 是 Engine Core 和 Worker 之间的边界。它把一次调度结果广播给所有 Worker，再收集结果。</p>
 <div class="am-table-wrap"><table>
 <thead>
@@ -617,8 +1068,8 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 <p>Worker 里是 ModelRunner。它维护请求状态，准备输入张量，调用模型前向，采样下一个 token。关键方法是 <code>_update_states</code>、<code>_prepare_inputs</code>、<code>execute_model</code>、<code>capture_model</code>。</p>
 </div></div>
 </section>
-<section class="am-panel" id="panel-G">
-<header class="am-panel-head"><span class="am-panel-id">G</span><h2>模型与算子</h2></header>
+<section class="am-panel" id="panel-K">
+<header class="am-panel-head"><span class="am-panel-id">K</span><h2>模型与算子</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>模型层由注册表驱动。vLLM 把 Hugging Face 的 architecture 名映射到模型类。所有模型使用统一构造签名：</p>
 </div>
 <pre class="am-code"><code data-lang="python">def __init__(self, *, vllm_config: VllmConfig, prefix: str = &quot;&quot;)</code></pre>
@@ -660,20 +1111,20 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 <p>底层算子在 <code>csrc/</code> 里用 CUDA/HIP 编写，另有 CUTLASS、Triton 和 CuTeDSL 实现。</p>
 </div></div>
 </section>
-<section class="am-panel" id="panel-H">
-<header class="am-panel-head"><span class="am-panel-id">H</span><h2>编译与 CUDA Graph</h2></header>
+<section class="am-panel" id="panel-L">
+<header class="am-panel-head"><span class="am-panel-id">L</span><h2>编译与 CUDA Graph</h2></header>
 <div class="am-panel-body"><div class="am-md"><p>vLLM 用 torch.compile 做图级优化，再用 CUDA Graph 消除启动开销。两者结合成 piecewise 方案：图按 shape 分桶，decode 用完整 CUDA Graph，prefill 用分段图。</p>
 <p>编译结果按 batch 大小缓存。启动时用 <code>_dummy_run</code> 预热并捕获常见 shape。运行中遇到新 shape 就回退到 eager。</p>
 </div></div>
 </section>
-<section class="am-panel" id="panel-I">
-<header class="am-panel-head"><span class="am-panel-id">I</span><h2>一次请求的旅程</h2></header>
-<div class="am-panel-body"><figure class="am-diagram am-seq"><svg viewBox="0 0 1327 670" width="1327" height="670" role="img" aria-label="时序图：客户端、API Server、AsyncLLM、EngineCore、Scheduler、Executor、Worker、ModelRunner、Detokenizer" xmlns="http://www.w3.org/2000/svg"><defs><marker id="am4-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs><line class="am-lifeline" x1="54" y1="42" x2="54" y2="666"/><rect class="am-actor" x="12" y="8" width="84" height="34" rx="2"/><text x="54" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">客户端</text><line class="am-lifeline" x1="254.6" y1="42" x2="254.6" y2="666"/><rect class="am-actor" x="208.3" y="8" width="92.7" height="34" rx="2"/><text x="254.6" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">API Server</text><line class="am-lifeline" x1="376.4" y1="42" x2="376.4" y2="666"/><rect class="am-actor" x="329" y="8" width="94.8" height="34" rx="2"/><text x="376.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">AsyncLLM</text><line class="am-lifeline" x1="582.5" y1="42" x2="582.5" y2="666"/><rect class="am-actor" x="533.6" y="8" width="97.7" height="34" rx="2"/><text x="582.5" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">EngineCore</text><line class="am-lifeline" x1="722.8" y1="42" x2="722.8" y2="666"/><rect class="am-actor" x="678.4" y="8" width="88.8" height="34" rx="2"/><text x="722.8" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Scheduler</text><line class="am-lifeline" x1="864.1" y1="42" x2="864.1" y2="666"/><rect class="am-actor" x="822.1" y="8" width="84" height="34" rx="2"/><text x="864.1" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Executor</text><line class="am-lifeline" x1="1006.8" y1="42" x2="1006.8" y2="666"/><rect class="am-actor" x="964.8" y="8" width="84" height="34" rx="2"/><text x="1006.8" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Worker</text><line class="am-lifeline" x1="1130.4" y1="42" x2="1130.4" y2="666"/><rect class="am-actor" x="1076.8" y="8" width="107.3" height="34" rx="2"/><text x="1130.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">ModelRunner</text><line class="am-lifeline" x1="1263.4" y1="42" x2="1263.4" y2="666"/><rect class="am-actor" x="1212.1" y="8" width="102.6" height="34" rx="2"/><text x="1263.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Detokenizer</text><text x="154.3" y="70" text-anchor="middle">POST /v1/chat/completions</text><path class="am-edge" d="M54,80 L252.6,80" marker-end="url(#am4-arrow)"/><text x="315.5" y="110" text-anchor="middle">add_request</text><path class="am-edge" d="M254.6,120 L374.4,120" marker-end="url(#am4-arrow)"/><text x="479.4" y="150" text-anchor="middle">ZMQ 发送 EngineCoreRequest</text><path class="am-edge" d="M376.4,160 L580.5,160" marker-end="url(#am4-arrow)"/><text x="652.6" y="190" text-anchor="middle">入等待队列</text><path class="am-edge" d="M582.5,200 L720.8,200" marker-end="url(#am4-arrow)"/><text x="793.5" y="230" text-anchor="middle">SchedulerOutput</text><path class="am-edge" d="M722.8,240 L862.1,240" marker-end="url(#am4-arrow)"/><text x="935.4" y="270" text-anchor="middle">execute_model</text><path class="am-edge" d="M864.1,280 L1004.8,280" marker-end="url(#am4-arrow)"/><text x="1068.6" y="310" text-anchor="middle">前向 + 采样</text><path class="am-edge" d="M1006.8,320 L1128.4,320" marker-end="url(#am4-arrow)"/><text x="1068.6" y="350" text-anchor="middle">新 token</text><path class="am-edge am-edge--dashed" d="M1130.4,360 L1008.8,360" marker-end="url(#am4-arrow)"/><text x="935.4" y="390" text-anchor="middle">ModelRunnerOutput</text><path class="am-edge am-edge--dashed" d="M1006.8,400 L866.1,400" marker-end="url(#am4-arrow)"/><text x="793.5" y="430" text-anchor="middle">update_from_output</text><path class="am-edge am-edge--dashed" d="M864.1,440 L724.8,440" marker-end="url(#am4-arrow)"/><text x="652.6" y="470" text-anchor="middle">EngineCoreOutputs</text><path class="am-edge am-edge--dashed" d="M722.8,480 L584.5,480" marker-end="url(#am4-arrow)"/><text x="479.4" y="510" text-anchor="middle">ZMQ 回传</text><path class="am-edge am-edge--dashed" d="M582.5,520 L378.4,520" marker-end="url(#am4-arrow)"/><text x="819.9" y="550" text-anchor="middle">增量 token</text><path class="am-edge" d="M376.4,560 L1261.4,560" marker-end="url(#am4-arrow)"/><text x="759" y="590" text-anchor="middle">文本增量</text><path class="am-edge am-edge--dashed" d="M1263.4,600 L256.6,600" marker-end="url(#am4-arrow)"/><text x="154.3" y="630" text-anchor="middle">SSE</text><path class="am-edge am-edge--dashed" d="M254.6,640 L56,640" marker-end="url(#am4-arrow)"/></svg></figure>
+<section class="am-panel" id="panel-M">
+<header class="am-panel-head"><span class="am-panel-id">M</span><h2>一次请求的旅程</h2></header>
+<div class="am-panel-body"><figure class="am-diagram am-seq"><svg viewBox="0 0 1327 670" width="1327" height="670" role="img" aria-label="时序图：客户端、API Server、AsyncLLM、EngineCore、Scheduler、Executor、Worker、ModelRunner、Detokenizer" xmlns="http://www.w3.org/2000/svg"><defs><marker id="am2-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs><line class="am-lifeline" x1="54" y1="42" x2="54" y2="666"/><rect class="am-actor" x="12" y="8" width="84" height="34" rx="2"/><text x="54" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">客户端</text><line class="am-lifeline" x1="254.6" y1="42" x2="254.6" y2="666"/><rect class="am-actor" x="208.3" y="8" width="92.7" height="34" rx="2"/><text x="254.6" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">API Server</text><line class="am-lifeline" x1="376.4" y1="42" x2="376.4" y2="666"/><rect class="am-actor" x="329" y="8" width="94.8" height="34" rx="2"/><text x="376.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">AsyncLLM</text><line class="am-lifeline" x1="582.5" y1="42" x2="582.5" y2="666"/><rect class="am-actor" x="533.6" y="8" width="97.7" height="34" rx="2"/><text x="582.5" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">EngineCore</text><line class="am-lifeline" x1="722.8" y1="42" x2="722.8" y2="666"/><rect class="am-actor" x="678.4" y="8" width="88.8" height="34" rx="2"/><text x="722.8" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Scheduler</text><line class="am-lifeline" x1="864.1" y1="42" x2="864.1" y2="666"/><rect class="am-actor" x="822.1" y="8" width="84" height="34" rx="2"/><text x="864.1" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Executor</text><line class="am-lifeline" x1="1006.8" y1="42" x2="1006.8" y2="666"/><rect class="am-actor" x="964.8" y="8" width="84" height="34" rx="2"/><text x="1006.8" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Worker</text><line class="am-lifeline" x1="1130.4" y1="42" x2="1130.4" y2="666"/><rect class="am-actor" x="1076.8" y="8" width="107.3" height="34" rx="2"/><text x="1130.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">ModelRunner</text><line class="am-lifeline" x1="1263.4" y1="42" x2="1263.4" y2="666"/><rect class="am-actor" x="1212.1" y="8" width="102.6" height="34" rx="2"/><text x="1263.4" y="25" text-anchor="middle" dominant-baseline="central" font-weight="600">Detokenizer</text><text x="154.3" y="70" text-anchor="middle">POST /v1/chat/completions</text><path class="am-edge" d="M54,80 L252.6,80" marker-end="url(#am2-arrow)"/><text x="315.5" y="110" text-anchor="middle">add_request</text><path class="am-edge" d="M254.6,120 L374.4,120" marker-end="url(#am2-arrow)"/><text x="479.4" y="150" text-anchor="middle">ZMQ 发送 EngineCoreRequest</text><path class="am-edge" d="M376.4,160 L580.5,160" marker-end="url(#am2-arrow)"/><text x="652.6" y="190" text-anchor="middle">入等待队列</text><path class="am-edge" d="M582.5,200 L720.8,200" marker-end="url(#am2-arrow)"/><text x="793.5" y="230" text-anchor="middle">SchedulerOutput</text><path class="am-edge" d="M722.8,240 L862.1,240" marker-end="url(#am2-arrow)"/><text x="935.4" y="270" text-anchor="middle">execute_model</text><path class="am-edge" d="M864.1,280 L1004.8,280" marker-end="url(#am2-arrow)"/><text x="1068.6" y="310" text-anchor="middle">前向 + 采样</text><path class="am-edge" d="M1006.8,320 L1128.4,320" marker-end="url(#am2-arrow)"/><text x="1068.6" y="350" text-anchor="middle">新 token</text><path class="am-edge am-edge--dashed" d="M1130.4,360 L1008.8,360" marker-end="url(#am2-arrow)"/><text x="935.4" y="390" text-anchor="middle">ModelRunnerOutput</text><path class="am-edge am-edge--dashed" d="M1006.8,400 L866.1,400" marker-end="url(#am2-arrow)"/><text x="793.5" y="430" text-anchor="middle">update_from_output</text><path class="am-edge am-edge--dashed" d="M864.1,440 L724.8,440" marker-end="url(#am2-arrow)"/><text x="652.6" y="470" text-anchor="middle">EngineCoreOutputs</text><path class="am-edge am-edge--dashed" d="M722.8,480 L584.5,480" marker-end="url(#am2-arrow)"/><text x="479.4" y="510" text-anchor="middle">ZMQ 回传</text><path class="am-edge am-edge--dashed" d="M582.5,520 L378.4,520" marker-end="url(#am2-arrow)"/><text x="819.9" y="550" text-anchor="middle">增量 token</text><path class="am-edge" d="M376.4,560 L1261.4,560" marker-end="url(#am2-arrow)"/><text x="759" y="590" text-anchor="middle">文本增量</text><path class="am-edge am-edge--dashed" d="M1263.4,600 L256.6,600" marker-end="url(#am2-arrow)"/><text x="154.3" y="630" text-anchor="middle">SSE</text><path class="am-edge am-edge--dashed" d="M254.6,640 L56,640" marker-end="url(#am2-arrow)"/></svg></figure>
 <div class="am-md"><p>请求结束时，调度器释放 KV block。block 留在池里供后续请求命中，直到被驱逐。</p>
 </div></div>
 </section>
-<section class="am-panel" id="panel-J">
-<header class="am-panel-head"><span class="am-panel-id">J</span><h2>并行与加速子系统</h2></header>
+<section class="am-panel" id="panel-N">
+<header class="am-panel-head"><span class="am-panel-id">N</span><h2>并行与加速子系统</h2></header>
 <div class="am-panel-body"><div class="am-md"><div class="am-table-wrap"><table>
 <thead>
 <tr>
@@ -708,8 +1159,8 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 <p>分离式服务把 prefill、decode、encode 拆到不同实例。KV Connector 负责跨实例搬运 KV cache。</p>
 </div></div>
 </section>
-<section class="am-panel" id="panel-K">
-<header class="am-panel-head"><span class="am-panel-id">K</span><h2>代码地图</h2></header>
+<section class="am-panel" id="panel-O">
+<header class="am-panel-head"><span class="am-panel-id">O</span><h2>代码地图</h2></header>
 <div class="am-panel-body"><div class="am-tree"><div class="am-tree-cols am-tree-cols--free" style="--n: 4"><div class="am-tree-col"><div class="am-tree-box">vllm/</div><ul class="am-tree-list"><li><span class="am-tree-label">entrypoints/</span><span class="am-tree-sub">CLI 与服务入口</span><ul><li><span class="am-tree-label">cli/</span><span class="am-tree-sub">vllm serve / chat / bench</span></li><li><span class="am-tree-label">openai/</span><span class="am-tree-sub">OpenAI 兼容接口</span></li><li><span class="am-tree-label">llm.py</span><span class="am-tree-sub">Python LLM 类</span></li></ul></li><li><span class="am-tree-label">v1/</span><ul><li><span class="am-tree-label">engine/</span><span class="am-tree-sub">EngineCore、AsyncLLM、客户端</span></li><li><span class="am-tree-label">core/sched/</span><span class="am-tree-sub">调度器</span></li><li><span class="am-tree-label">core/kv_cache_manager.py</span><span class="am-tree-sub">KV cache 分配</span></li><li><span class="am-tree-label">executor/</span><span class="am-tree-sub">执行器实现</span></li><li><span class="am-tree-label">worker/</span><span class="am-tree-sub">Worker 与 ModelRunner</span></li><li><span class="am-tree-label">attention/</span><span class="am-tree-sub">注意力后端</span></li><li><span class="am-tree-label">spec_decode/</span><span class="am-tree-sub">投机解码</span></li></ul></li><li><span class="am-tree-label">model_executor/</span><ul><li><span class="am-tree-label">models/</span><span class="am-tree-sub">模型实现与注册表</span></li><li><span class="am-tree-label">layers/</span><span class="am-tree-sub">并行线性层与量化</span></li></ul></li><li><span class="am-tree-label">distributed/</span><span class="am-tree-sub">并行组与通信</span></li><li><span class="am-tree-label">compilation/</span><span class="am-tree-sub">torch.compile 与 CUDA Graph</span></li><li><span class="am-tree-label">platforms/</span><span class="am-tree-sub">硬件适配</span></li><li><span class="am-tree-label">config/</span><span class="am-tree-sub">VllmConfig 及子配置</span></li></ul></div><div class="am-tree-col"><div class="am-tree-box">csrc/<small>CUDA / HIP 内核源码</small></div></div><div class="am-tree-col"><div class="am-tree-box">tests/<small>测试</small></div></div><div class="am-tree-col"><div class="am-tree-box">docs/design/<small>设计文档</small></div></div></div></div>
 <div class="am-md"><div class="am-table-wrap"><table>
 <thead>
@@ -765,8 +1216,8 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 </tbody></table></div>
 </div></div>
 </section>
-<section class="am-panel" id="panel-L">
-<header class="am-panel-head"><span class="am-panel-id">L</span><h2>阅读路径</h2></header>
+<section class="am-panel" id="panel-P">
+<header class="am-panel-head"><span class="am-panel-id">P</span><h2>阅读路径</h2></header>
 <div class="am-panel-body"><div class="am-md"><div class="am-table-wrap"><table>
 <thead>
 <tr>
@@ -805,7 +1256,7 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。</p>
 </div>
 </div>
 </main>
-<footer class="am-colophon">Generated by Answer me with HTML 0.2.2 · 2026-11-04 22:13</footer>
+<footer class="am-colophon">Generated by Answer me with HTML 0.2.2 · 2026-11-05 00:08</footer>
 <textarea id="am-source" hidden readonly aria-hidden="true">---
 template: doc
 theme: shadcn
@@ -835,27 +1286,100 @@ CPU 只决定&quot;这一步算什么&quot;，GPU 只负责算。两者之间传
 
 控制面自上而下。入口层不碰 GPU，Worker 不碰 HTTP。
 
-```flow TD
-(客户端) -&gt; 入口层: HTTP / Python / gRPC
-入口层 -&gt; 编排层: AsyncLLM / LLMEngine
-编排层 -&gt; EngineCore: ZMQ 或进程内调用
-EngineCore -&gt; Scheduler: 每步组批
-EngineCore -&gt; Executor: 下发 SchedulerOutput
-Scheduler -&gt; KVManager: 分配 block
-Executor -&gt; Worker: collective_rpc
-Worker -&gt; ModelRunner: 准备输入
-ModelRunner -&gt; 模型与Kernel: forward
+```svg
+&lt;svg viewBox=&quot;0 0 960 470&quot; role=&quot;img&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; style=&quot;display:block;width:100%;height:auto&quot;&gt;
+  &lt;defs&gt;
+    &lt;filter id=&quot;shL&quot; x=&quot;-20%&quot; y=&quot;-20%&quot; width=&quot;140%&quot; height=&quot;140%&quot;&gt;
+      &lt;feDropShadow dx=&quot;0&quot; dy=&quot;2&quot; stdDeviation=&quot;3&quot; flood-color=&quot;#000&quot; flood-opacity=&quot;0.10&quot;/&gt;
+    &lt;/filter&gt;
+    &lt;marker id=&quot;arL&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;&gt;
+      &lt;path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--ink-3)&quot;/&gt;
+    &lt;/marker&gt;
+  &lt;/defs&gt;
+
+  &lt;g filter=&quot;url(#shL)&quot;&gt;
+    &lt;rect x=&quot;190&quot; y=&quot;22&quot; width=&quot;560&quot; height=&quot;56&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;190&quot; y=&quot;112&quot; width=&quot;560&quot; height=&quot;56&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;190&quot; y=&quot;202&quot; width=&quot;560&quot; height=&quot;56&quot; rx=&quot;10&quot; fill=&quot;var(--ok-bg)&quot; stroke=&quot;var(--ok)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;190&quot; y=&quot;292&quot; width=&quot;560&quot; height=&quot;56&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;190&quot; y=&quot;382&quot; width=&quot;560&quot; height=&quot;56&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;text x=&quot;212&quot; y=&quot;46&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;入口层&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;64&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;HTTP · Python · gRPC · OpenAI 兼容接口&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;136&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;引擎编排层&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;154&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;AsyncLLM / LLMEngine · 请求生命周期 · 流式输出&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;226&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;引擎核心层&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;244&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;EngineCore · Scheduler · KVCacheManager · Executor&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;316&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;执行层&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;334&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;Worker × N · 每 GPU 一个进程 · ModelRunner&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;406&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;模型与 Kernel&lt;/text&gt;
+    &lt;text x=&quot;212&quot; y=&quot;424&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;nn.Module · FlashAttention · CUTLASS / Triton&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;g fill=&quot;none&quot; stroke=&quot;var(--ink-3)&quot; stroke-width=&quot;1.5&quot; stroke-opacity=&quot;.75&quot;&gt;
+    &lt;path d=&quot;M470,78 V112&quot; marker-end=&quot;url(#arL)&quot;/&gt;
+    &lt;path d=&quot;M470,168 V202&quot; marker-end=&quot;url(#arL)&quot;/&gt;
+    &lt;path d=&quot;M470,258 V292&quot; marker-end=&quot;url(#arL)&quot;/&gt;
+    &lt;path d=&quot;M470,348 V382&quot; marker-end=&quot;url(#arL)&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot;&gt;
+    &lt;text x=&quot;484&quot; y=&quot;99&quot;&gt;HTTP 请求 / 流式响应&lt;/text&gt;
+    &lt;text x=&quot;484&quot; y=&quot;189&quot;&gt;ZMQ 或进程内调用&lt;/text&gt;
+    &lt;text x=&quot;484&quot; y=&quot;279&quot;&gt;collective_rpc&lt;/text&gt;
+    &lt;text x=&quot;484&quot; y=&quot;369&quot;&gt;forward / sample&lt;/text&gt;
+  &lt;/g&gt;
+&lt;/svg&gt;
 ```
 
 ## 进程架构
 
 V1 按职责切进程。每个进程只做一类事。
 
-```flow LR
-(客户端) -&gt; API Server: HTTP / SSE
-API Server -&gt; Engine Core: ZMQ
-Engine Core -&gt; GPU Worker: 共享内存队列
-GPU Worker -&gt; GPU: 前向
+```svg
+&lt;svg viewBox=&quot;0 0 960 180&quot; role=&quot;img&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; style=&quot;display:block;width:100%;height:auto&quot;&gt;
+  &lt;defs&gt;
+    &lt;filter id=&quot;shP&quot; x=&quot;-20%&quot; y=&quot;-20%&quot; width=&quot;140%&quot; height=&quot;140%&quot;&gt;
+      &lt;feDropShadow dx=&quot;0&quot; dy=&quot;2&quot; stdDeviation=&quot;3&quot; flood-color=&quot;#000&quot; flood-opacity=&quot;0.10&quot;/&gt;
+    &lt;/filter&gt;
+    &lt;marker id=&quot;arP&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;&gt;
+      &lt;path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--ink-3)&quot;/&gt;
+    &lt;/marker&gt;
+  &lt;/defs&gt;
+
+  &lt;g filter=&quot;url(#shP)&quot;&gt;
+    &lt;rect x=&quot;30&quot; y=&quot;64&quot; width=&quot;120&quot; height=&quot;60&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;200&quot; y=&quot;64&quot; width=&quot;150&quot; height=&quot;60&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;400&quot; y=&quot;64&quot; width=&quot;150&quot; height=&quot;60&quot; rx=&quot;10&quot; fill=&quot;var(--ok-bg)&quot; stroke=&quot;var(--ok)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;600&quot; y=&quot;64&quot; width=&quot;150&quot; height=&quot;60&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;800&quot; y=&quot;64&quot; width=&quot;120&quot; height=&quot;60&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;text x=&quot;48&quot; y=&quot;90&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;客户端&lt;/text&gt;
+    &lt;text x=&quot;48&quot; y=&quot;108&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;HTTP 请求&lt;/text&gt;
+    &lt;text x=&quot;218&quot; y=&quot;90&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;API Server&lt;/text&gt;
+    &lt;text x=&quot;218&quot; y=&quot;108&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;分词 · 流式&lt;/text&gt;
+    &lt;text x=&quot;418&quot; y=&quot;90&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Engine Core&lt;/text&gt;
+    &lt;text x=&quot;418&quot; y=&quot;108&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;调度 · KV cache&lt;/text&gt;
+    &lt;text x=&quot;618&quot; y=&quot;90&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU Worker&lt;/text&gt;
+    &lt;text x=&quot;618&quot; y=&quot;108&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;每卡一个进程&lt;/text&gt;
+    &lt;text x=&quot;818&quot; y=&quot;90&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU&lt;/text&gt;
+    &lt;text x=&quot;818&quot; y=&quot;108&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;显存 · 算力&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;g fill=&quot;none&quot; stroke=&quot;var(--ink-3)&quot; stroke-width=&quot;1.5&quot; stroke-opacity=&quot;.75&quot;&gt;
+    &lt;path d=&quot;M150,94 H200&quot; marker-end=&quot;url(#arP)&quot;/&gt;
+    &lt;path d=&quot;M350,94 H400&quot; marker-end=&quot;url(#arP)&quot;/&gt;
+    &lt;path d=&quot;M550,94 H600&quot; marker-end=&quot;url(#arP)&quot;/&gt;
+    &lt;path d=&quot;M750,94 H800&quot; marker-end=&quot;url(#arP)&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot; text-anchor=&quot;middle&quot;&gt;
+    &lt;text x=&quot;175&quot; y=&quot;84&quot;&gt;HTTP / SSE&lt;/text&gt;
+    &lt;text x=&quot;375&quot; y=&quot;84&quot;&gt;ZMQ&lt;/text&gt;
+    &lt;text x=&quot;575&quot; y=&quot;84&quot;&gt;共享内存&lt;/text&gt;
+    &lt;text x=&quot;775&quot; y=&quot;84&quot;&gt;前向&lt;/text&gt;
+  &lt;/g&gt;
+&lt;/svg&gt;
 ```
 
 | 进程 | 数量 | 职责 |
@@ -871,6 +1395,322 @@ TP=2、DP=4、8 卡：4 + 4 + 8 + 1，共 17 个进程。
 ```
 
 API Server 与 Engine Core 是多对多 ZMQ。Engine Core 与 Worker 之间走共享内存消息队列。SchedulerOutput 广播给所有 Worker，Worker 回传 ModelRunnerOutput。
+
+## 部署形态一：单机多卡
+
+最常见的形态。所有进程在同一台机器，用默认 `mp` 后端。
+
+```svg
+&lt;svg viewBox=&quot;0 0 960 340&quot; role=&quot;img&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; style=&quot;display:block;width:100%;height:auto&quot;&gt;
+  &lt;defs&gt;
+    &lt;filter id=&quot;shA&quot; x=&quot;-20%&quot; y=&quot;-20%&quot; width=&quot;140%&quot; height=&quot;140%&quot;&gt;
+      &lt;feDropShadow dx=&quot;0&quot; dy=&quot;2&quot; stdDeviation=&quot;3&quot; flood-color=&quot;#000&quot; flood-opacity=&quot;0.10&quot;/&gt;
+    &lt;/filter&gt;
+    &lt;marker id=&quot;arA&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;&gt;
+      &lt;path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--ink-3)&quot;/&gt;
+    &lt;/marker&gt;
+  &lt;/defs&gt;
+
+  &lt;rect x=&quot;28&quot; y=&quot;18&quot; width=&quot;904&quot; height=&quot;304&quot; rx=&quot;16&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;7 6&quot;/&gt;
+  &lt;text x=&quot;48&quot; y=&quot;44&quot; style=&quot;font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em&quot;&gt;单节点 · 4 × GPU&lt;/text&gt;
+
+  &lt;g style=&quot;font-family:var(--font-sans)&quot; fill=&quot;var(--ink-3)&quot; font-size=&quot;10.5&quot;&gt;
+    &lt;circle cx=&quot;612&quot; cy=&quot;38&quot; r=&quot;4&quot; fill=&quot;var(--accent)&quot;/&gt;&lt;text x=&quot;622&quot; y=&quot;42&quot;&gt;入口&lt;/text&gt;
+    &lt;circle cx=&quot;676&quot; cy=&quot;38&quot; r=&quot;4&quot; fill=&quot;var(--ok)&quot;/&gt;&lt;text x=&quot;686&quot; y=&quot;42&quot;&gt;引擎&lt;/text&gt;
+    &lt;circle cx=&quot;740&quot; cy=&quot;38&quot; r=&quot;4&quot; fill=&quot;var(--warn)&quot;/&gt;&lt;text x=&quot;750&quot; y=&quot;42&quot;&gt;Worker&lt;/text&gt;
+    &lt;circle cx=&quot;818&quot; cy=&quot;38&quot; r=&quot;4&quot; fill=&quot;var(--ink-3)&quot;/&gt;&lt;text x=&quot;828&quot; y=&quot;42&quot;&gt;GPU&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;g filter=&quot;url(#shA)&quot;&gt;
+    &lt;rect x=&quot;55&quot; y=&quot;138&quot; width=&quot;150&quot; height=&quot;66&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;text x=&quot;73&quot; y=&quot;166&quot; style=&quot;font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;API Server&lt;/text&gt;
+  &lt;text x=&quot;73&quot; y=&quot;186&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)&quot;&gt;HTTP / 分词 / 流式&lt;/text&gt;
+
+  &lt;g filter=&quot;url(#shA)&quot;&gt;
+    &lt;rect x=&quot;265&quot; y=&quot;138&quot; width=&quot;160&quot; height=&quot;66&quot; rx=&quot;10&quot; fill=&quot;var(--ok-bg)&quot; stroke=&quot;var(--ok)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;text x=&quot;283&quot; y=&quot;166&quot; style=&quot;font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Engine Core&lt;/text&gt;
+  &lt;text x=&quot;283&quot; y=&quot;186&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)&quot;&gt;调度 + KV cache&lt;/text&gt;
+
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;500&quot; y=&quot;56&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;518&quot; y=&quot;76&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 0&lt;/text&gt;
+    &lt;text x=&quot;518&quot; y=&quot;92&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;绑定 GPU 0&lt;/text&gt;
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;500&quot; y=&quot;120&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;518&quot; y=&quot;140&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 1&lt;/text&gt;
+    &lt;text x=&quot;518&quot; y=&quot;156&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;绑定 GPU 1&lt;/text&gt;
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;500&quot; y=&quot;184&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;518&quot; y=&quot;204&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 2&lt;/text&gt;
+    &lt;text x=&quot;518&quot; y=&quot;220&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;绑定 GPU 2&lt;/text&gt;
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;500&quot; y=&quot;248&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;518&quot; y=&quot;268&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 3&lt;/text&gt;
+    &lt;text x=&quot;518&quot; y=&quot;284&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;绑定 GPU 3&lt;/text&gt;
+
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;730&quot; y=&quot;56&quot; width=&quot;120&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;748&quot; y=&quot;76&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU 0&lt;/text&gt;
+    &lt;text x=&quot;748&quot; y=&quot;92&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;80 GB&lt;/text&gt;
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;730&quot; y=&quot;120&quot; width=&quot;120&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;748&quot; y=&quot;140&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU 1&lt;/text&gt;
+    &lt;text x=&quot;748&quot; y=&quot;156&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;80 GB&lt;/text&gt;
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;730&quot; y=&quot;184&quot; width=&quot;120&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;748&quot; y=&quot;204&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU 2&lt;/text&gt;
+    &lt;text x=&quot;748&quot; y=&quot;220&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;80 GB&lt;/text&gt;
+    &lt;g filter=&quot;url(#shA)&quot;&gt;&lt;rect x=&quot;730&quot; y=&quot;248&quot; width=&quot;120&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;&lt;/g&gt;
+    &lt;text x=&quot;748&quot; y=&quot;268&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU 3&lt;/text&gt;
+    &lt;text x=&quot;748&quot; y=&quot;284&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;80 GB&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;g fill=&quot;none&quot; stroke=&quot;var(--ink-3)&quot; stroke-width=&quot;1.5&quot; stroke-opacity=&quot;.75&quot;&gt;
+    &lt;path d=&quot;M205,171 H265&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M425,171 H462&quot;/&gt;
+    &lt;path d=&quot;M462,80 V272&quot;/&gt;
+    &lt;path d=&quot;M462,80 H500&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M462,144 H500&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M462,208 H500&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M462,272 H500&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M650,80 H730&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M650,144 H730&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M650,208 H730&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+    &lt;path d=&quot;M650,272 H730&quot; marker-end=&quot;url(#arA)&quot;/&gt;
+  &lt;/g&gt;
+  &lt;text x=&quot;220&quot; y=&quot;163&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot;&gt;ZMQ&lt;/text&gt;
+&lt;/svg&gt;
+```
+
+| 条件 | 后端 |
+|---|---|
+| TP × PP ≤ 本机 GPU 数 | `mp`，默认 |
+| 只有一张卡 | `uni`，单进程 |
+
+KV cache 和激活值都不出机器。启动命令只有一行：`vllm serve &lt;model&gt; -tp=4`。
+
+## 部署形态二：多机张量并行
+
+Head 节点跑 API Server 和 Engine Core，Worker 分布到多台机器。
+
+```svg
+&lt;svg viewBox=&quot;0 0 960 400&quot; role=&quot;img&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; style=&quot;display:block;width:100%;height:auto&quot;&gt;
+  &lt;defs&gt;
+    &lt;filter id=&quot;shB&quot; x=&quot;-20%&quot; y=&quot;-20%&quot; width=&quot;140%&quot; height=&quot;140%&quot;&gt;
+      &lt;feDropShadow dx=&quot;0&quot; dy=&quot;2&quot; stdDeviation=&quot;3&quot; flood-color=&quot;#000&quot; flood-opacity=&quot;0.10&quot;/&gt;
+    &lt;/filter&gt;
+    &lt;marker id=&quot;arB&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;&gt;
+      &lt;path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--ink-3)&quot;/&gt;
+    &lt;/marker&gt;
+  &lt;/defs&gt;
+
+  &lt;rect x=&quot;28&quot; y=&quot;12&quot; width=&quot;904&quot; height=&quot;140&quot; rx=&quot;16&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;7 6&quot;/&gt;
+  &lt;text x=&quot;48&quot; y=&quot;38&quot; style=&quot;font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em&quot;&gt;节点 0（Head）&lt;/text&gt;
+
+  &lt;g filter=&quot;url(#shB)&quot;&gt;
+    &lt;rect x=&quot;55&quot; y=&quot;58&quot; width=&quot;140&quot; height=&quot;52&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;225&quot; y=&quot;58&quot; width=&quot;150&quot; height=&quot;52&quot; rx=&quot;10&quot; fill=&quot;var(--ok-bg)&quot; stroke=&quot;var(--ok)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;430&quot; y=&quot;58&quot; width=&quot;150&quot; height=&quot;52&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;620&quot; y=&quot;58&quot; width=&quot;150&quot; height=&quot;52&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;text x=&quot;73&quot; y=&quot;80&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;API Server&lt;/text&gt;
+    &lt;text x=&quot;73&quot; y=&quot;97&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;HTTP / 分词&lt;/text&gt;
+    &lt;text x=&quot;243&quot; y=&quot;80&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Engine Core&lt;/text&gt;
+    &lt;text x=&quot;243&quot; y=&quot;97&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;调度 + KV cache&lt;/text&gt;
+    &lt;text x=&quot;448&quot; y=&quot;80&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 0&lt;/text&gt;
+    &lt;text x=&quot;448&quot; y=&quot;97&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;GPU 0&lt;/text&gt;
+    &lt;text x=&quot;638&quot; y=&quot;80&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 1&lt;/text&gt;
+    &lt;text x=&quot;638&quot; y=&quot;97&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;GPU 1&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;rect x=&quot;28&quot; y=&quot;190&quot; width=&quot;904&quot; height=&quot;140&quot; rx=&quot;16&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;7 6&quot;/&gt;
+  &lt;text x=&quot;48&quot; y=&quot;216&quot; style=&quot;font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em&quot;&gt;节点 1&lt;/text&gt;
+  &lt;text x=&quot;60&quot; y=&quot;266&quot; style=&quot;font-family:var(--font-sans);font-size:11px;fill:var(--ink-3)&quot;&gt;其余节点同构&lt;/text&gt;
+
+  &lt;g filter=&quot;url(#shB)&quot;&gt;
+    &lt;rect x=&quot;430&quot; y=&quot;236&quot; width=&quot;150&quot; height=&quot;52&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;620&quot; y=&quot;236&quot; width=&quot;150&quot; height=&quot;52&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;text x=&quot;448&quot; y=&quot;258&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 2&lt;/text&gt;
+    &lt;text x=&quot;448&quot; y=&quot;275&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;GPU 2&lt;/text&gt;
+    &lt;text x=&quot;638&quot; y=&quot;258&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Worker 3&lt;/text&gt;
+    &lt;text x=&quot;638&quot; y=&quot;275&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;GPU 3&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;g fill=&quot;none&quot; stroke=&quot;var(--ink-3)&quot; stroke-width=&quot;1.5&quot; stroke-opacity=&quot;.75&quot;&gt;
+    &lt;path d=&quot;M195,84 H225&quot; marker-end=&quot;url(#arB)&quot;/&gt;
+    &lt;path d=&quot;M375,84 H430&quot; marker-end=&quot;url(#arB)&quot;/&gt;
+    &lt;path d=&quot;M375,84 H400 V44 H695 V58&quot; marker-end=&quot;url(#arB)&quot;/&gt;
+    &lt;path d=&quot;M300,110 V165&quot; stroke-dasharray=&quot;5 4&quot;/&gt;
+    &lt;path d=&quot;M300,165 H505 V236&quot; stroke-dasharray=&quot;5 4&quot; marker-end=&quot;url(#arB)&quot;/&gt;
+    &lt;path d=&quot;M300,165 H695 V236&quot; stroke-dasharray=&quot;5 4&quot; marker-end=&quot;url(#arB)&quot;/&gt;
+  &lt;/g&gt;
+  &lt;rect x=&quot;438&quot; y=&quot;146&quot; width=&quot;104&quot; height=&quot;18&quot; rx=&quot;4&quot; fill=&quot;var(--paper)&quot;/&gt;
+  &lt;text x=&quot;490&quot; y=&quot;159&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot; text-anchor=&quot;middle&quot;&gt;IB / 以太网&lt;/text&gt;
+  &lt;text x=&quot;212&quot; y=&quot;76&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot;&gt;ZMQ&lt;/text&gt;
+&lt;/svg&gt;
+```
+
+两种拉起方式：
+
+| 方式 | 做法 | 适用 |
+|---|---|---|
+| `mp` | 每台机器起一个 `vllm serve`，设 `--nnodes`、`--node-rank`、`--master-addr`、`--master-port` | 无 Ray 集群，参数最轻 |
+| `ray` | `--distributed-executor-backend ray`，由 Ray 调度 Worker | 已有 Ray 集群 |
+
+节点内走 NVLink，节点间走 InfiniBand 或高速以太网。TP 每层都要 all-reduce，跨节点延迟很敏感。PP 只传激活值，跨节点更划算。
+
+## 部署形态三：数据并行
+
+DP 复制完整模型。每个 DP rank 有自己的 Engine Core 和 KV cache。
+
+```svg
+&lt;svg viewBox=&quot;0 0 960 420&quot; role=&quot;img&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; style=&quot;display:block;width:100%;height:auto&quot;&gt;
+  &lt;defs&gt;
+    &lt;filter id=&quot;shC&quot; x=&quot;-20%&quot; y=&quot;-20%&quot; width=&quot;140%&quot; height=&quot;140%&quot;&gt;
+      &lt;feDropShadow dx=&quot;0&quot; dy=&quot;2&quot; stdDeviation=&quot;3&quot; flood-color=&quot;#000&quot; flood-opacity=&quot;0.10&quot;/&gt;
+    &lt;/filter&gt;
+    &lt;marker id=&quot;arC&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;&gt;
+      &lt;path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--ink-3)&quot;/&gt;
+    &lt;/marker&gt;
+  &lt;/defs&gt;
+
+  &lt;g filter=&quot;url(#shC)&quot;&gt;
+    &lt;rect x=&quot;390&quot; y=&quot;14&quot; width=&quot;180&quot; height=&quot;54&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;text x=&quot;480&quot; y=&quot;38&quot; style=&quot;font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)&quot; text-anchor=&quot;middle&quot;&gt;负载均衡&lt;/text&gt;
+  &lt;text x=&quot;480&quot; y=&quot;54&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)&quot; text-anchor=&quot;middle&quot;&gt;外部 LB 或 DP 路由&lt;/text&gt;
+
+  &lt;rect x=&quot;40&quot; y=&quot;96&quot; width=&quot;420&quot; height=&quot;280&quot; rx=&quot;16&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;7 6&quot;/&gt;
+  &lt;text x=&quot;60&quot; y=&quot;122&quot; style=&quot;font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em&quot;&gt;DP rank 0 · TP=2&lt;/text&gt;
+  &lt;rect x=&quot;500&quot; y=&quot;96&quot; width=&quot;420&quot; height=&quot;280&quot; rx=&quot;16&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;7 6&quot;/&gt;
+  &lt;text x=&quot;520&quot; y=&quot;122&quot; style=&quot;font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em&quot;&gt;DP rank 1 · TP=2&lt;/text&gt;
+
+  &lt;g filter=&quot;url(#shC)&quot;&gt;
+    &lt;rect x=&quot;70&quot; y=&quot;140&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;530&quot; y=&quot;140&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;70&quot; y=&quot;240&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--ok-bg)&quot; stroke=&quot;var(--ok)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;530&quot; y=&quot;240&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--ok-bg)&quot; stroke=&quot;var(--ok)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;text x=&quot;88&quot; y=&quot;164&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;API Server 0&lt;/text&gt;
+    &lt;text x=&quot;88&quot; y=&quot;180&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;HTTP / 分词&lt;/text&gt;
+    &lt;text x=&quot;548&quot; y=&quot;164&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;API Server 1&lt;/text&gt;
+    &lt;text x=&quot;548&quot; y=&quot;180&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;HTTP / 分词&lt;/text&gt;
+    &lt;text x=&quot;88&quot; y=&quot;264&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Engine Core 0&lt;/text&gt;
+    &lt;text x=&quot;88&quot; y=&quot;280&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;调度 + KV cache&lt;/text&gt;
+    &lt;text x=&quot;548&quot; y=&quot;264&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Engine Core 1&lt;/text&gt;
+    &lt;text x=&quot;548&quot; y=&quot;280&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;调度 + KV cache&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;g filter=&quot;url(#shC)&quot;&gt;
+    &lt;rect x=&quot;70&quot; y=&quot;316&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;530&quot; y=&quot;316&quot; width=&quot;150&quot; height=&quot;48&quot; rx=&quot;10&quot; fill=&quot;var(--fill)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;text x=&quot;88&quot; y=&quot;340&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU 组 0&lt;/text&gt;
+    &lt;text x=&quot;88&quot; y=&quot;356&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;GPU 0 / 1 · 独立 KV&lt;/text&gt;
+    &lt;text x=&quot;548&quot; y=&quot;340&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;GPU 组 1&lt;/text&gt;
+    &lt;text x=&quot;548&quot; y=&quot;356&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;GPU 2 / 3 · 独立 KV&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;line x1=&quot;70&quot; y1=&quot;214&quot; x2=&quot;890&quot; y2=&quot;214&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;1.5&quot; stroke-opacity=&quot;.45&quot; stroke-dasharray=&quot;3 4&quot;/&gt;
+  &lt;rect x=&quot;424&quot; y=&quot;196&quot; width=&quot;112&quot; height=&quot;18&quot; rx=&quot;4&quot; fill=&quot;var(--paper)&quot;/&gt;
+  &lt;text x=&quot;480&quot; y=&quot;209&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot; text-anchor=&quot;middle&quot;&gt;ZMQ 多对多&lt;/text&gt;
+
+  &lt;g fill=&quot;none&quot; stroke=&quot;var(--ink-3)&quot; stroke-width=&quot;1.5&quot; stroke-opacity=&quot;.75&quot;&gt;
+    &lt;path d=&quot;M480,68 V88 H145 V140&quot; marker-end=&quot;url(#arC)&quot;/&gt;
+    &lt;path d=&quot;M480,68 V88 H605 V140&quot; marker-end=&quot;url(#arC)&quot;/&gt;
+    &lt;path d=&quot;M145,188 V240&quot;/&gt;
+    &lt;path d=&quot;M605,188 V240&quot;/&gt;
+    &lt;path d=&quot;M145,288 V316&quot; marker-end=&quot;url(#arC)&quot;/&gt;
+    &lt;path d=&quot;M605,288 V316&quot; marker-end=&quot;url(#arC)&quot;/&gt;
+  &lt;/g&gt;
+  &lt;text x=&quot;60&quot; y=&quot;404&quot; style=&quot;font-family:var(--font-sans);font-size:11px;fill:var(--ink-3)&quot;&gt;DP &amp;gt; 1 时另有 1 个 DP Coordinator 进程，负责跨 rank 均衡与同步。&lt;/text&gt;
+&lt;/svg&gt;
+```
+
+| 特性 | 说明 |
+|---|---|
+| 请求路由 | 外部负载均衡，或 DP Coordinator 内部均衡 |
+| API Server 数量 | 默认等于 DP，可用 `--api-server-count` 调整 |
+| 适合场景 | 单模型放得下，要更高总吞吐 |
+| 不适合 | 单请求需要跨卡低延迟 |
+
+DP 与 EP 可以叠加：数据并行复制注意力，专家并行切分 MoE。
+
+## 部署形态四：分离式服务
+
+Prefill、Decode、Encode 拆成独立实例池，按阶段配资源。
+
+```svg
+&lt;svg viewBox=&quot;0 0 960 360&quot; role=&quot;img&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; style=&quot;display:block;width:100%;height:auto&quot;&gt;
+  &lt;defs&gt;
+    &lt;filter id=&quot;shD&quot; x=&quot;-20%&quot; y=&quot;-20%&quot; width=&quot;140%&quot; height=&quot;140%&quot;&gt;
+      &lt;feDropShadow dx=&quot;0&quot; dy=&quot;2&quot; stdDeviation=&quot;3&quot; flood-color=&quot;#000&quot; flood-opacity=&quot;0.10&quot;/&gt;
+    &lt;/filter&gt;
+    &lt;marker id=&quot;arD&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;&gt;
+      &lt;path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--ink-3)&quot;/&gt;
+    &lt;/marker&gt;
+    &lt;marker id=&quot;arAccD&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;&gt;
+      &lt;path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--accent)&quot;/&gt;
+    &lt;/marker&gt;
+  &lt;/defs&gt;
+
+  &lt;g filter=&quot;url(#shD)&quot;&gt;
+    &lt;rect x=&quot;380&quot; y=&quot;14&quot; width=&quot;200&quot; height=&quot;50&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;380&quot; y=&quot;92&quot; width=&quot;200&quot; height=&quot;50&quot; rx=&quot;10&quot; fill=&quot;var(--accent-bg)&quot; stroke=&quot;var(--accent)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;text x=&quot;480&quot; y=&quot;38&quot; style=&quot;font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)&quot; text-anchor=&quot;middle&quot;&gt;客户端&lt;/text&gt;
+  &lt;text x=&quot;480&quot; y=&quot;54&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)&quot; text-anchor=&quot;middle&quot;&gt;OpenAI / SDK&lt;/text&gt;
+  &lt;text x=&quot;480&quot; y=&quot;116&quot; style=&quot;font-family:var(--font-sans);font-size:13px;font-weight:600;fill:var(--ink)&quot; text-anchor=&quot;middle&quot;&gt;路由 / 调度器&lt;/text&gt;
+  &lt;text x=&quot;480&quot; y=&quot;132&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-2)&quot; text-anchor=&quot;middle&quot;&gt;按阶段转发&lt;/text&gt;
+
+  &lt;rect x=&quot;100&quot; y=&quot;180&quot; width=&quot;340&quot; height=&quot;120&quot; rx=&quot;16&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;7 6&quot;/&gt;
+  &lt;text x=&quot;120&quot; y=&quot;206&quot; style=&quot;font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em&quot;&gt;Prefill 池 · 算力密集&lt;/text&gt;
+  &lt;rect x=&quot;520&quot; y=&quot;180&quot; width=&quot;340&quot; height=&quot;120&quot; rx=&quot;16&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;7 6&quot;/&gt;
+  &lt;text x=&quot;540&quot; y=&quot;206&quot; style=&quot;font-family:var(--font-sans);font-size:12px;fill:var(--ink-3);letter-spacing:.04em&quot;&gt;Decode 池 · 显存密集&lt;/text&gt;
+
+  &lt;g filter=&quot;url(#shD)&quot;&gt;
+    &lt;rect x=&quot;120&quot; y=&quot;228&quot; width=&quot;140&quot; height=&quot;54&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;280&quot; y=&quot;228&quot; width=&quot;140&quot; height=&quot;54&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;540&quot; y=&quot;228&quot; width=&quot;140&quot; height=&quot;54&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+    &lt;rect x=&quot;700&quot; y=&quot;228&quot; width=&quot;140&quot; height=&quot;54&quot; rx=&quot;10&quot; fill=&quot;var(--warn-bg)&quot; stroke=&quot;var(--warn)&quot; stroke-opacity=&quot;.35&quot; stroke-width=&quot;1.2&quot;/&gt;
+  &lt;/g&gt;
+  &lt;g style=&quot;font-family:var(--font-sans)&quot;&gt;
+    &lt;text x=&quot;138&quot; y=&quot;252&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Prefill 0&lt;/text&gt;
+    &lt;text x=&quot;138&quot; y=&quot;270&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;长 prompt&lt;/text&gt;
+    &lt;text x=&quot;298&quot; y=&quot;252&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Prefill 1&lt;/text&gt;
+    &lt;text x=&quot;298&quot; y=&quot;270&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;长 prompt&lt;/text&gt;
+    &lt;text x=&quot;558&quot; y=&quot;252&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Decode 0&lt;/text&gt;
+    &lt;text x=&quot;558&quot; y=&quot;270&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;逐 token&lt;/text&gt;
+    &lt;text x=&quot;718&quot; y=&quot;252&quot; style=&quot;font-size:13px;font-weight:600;fill:var(--ink)&quot;&gt;Decode 1&lt;/text&gt;
+    &lt;text x=&quot;718&quot; y=&quot;270&quot; style=&quot;font-size:10.5px;fill:var(--ink-2)&quot;&gt;逐 token&lt;/text&gt;
+  &lt;/g&gt;
+
+  &lt;g fill=&quot;none&quot; stroke=&quot;var(--ink-3)&quot; stroke-width=&quot;1.5&quot; stroke-opacity=&quot;.75&quot;&gt;
+    &lt;path d=&quot;M430,142 V164 H190 V228&quot; marker-end=&quot;url(#arD)&quot;/&gt;
+    &lt;path d=&quot;M530,142 V164 H770 V228&quot; marker-end=&quot;url(#arD)&quot;/&gt;
+    &lt;path d=&quot;M840,255 H900 V39 H580&quot; stroke-dasharray=&quot;5 4&quot; marker-end=&quot;url(#arD)&quot;/&gt;
+  &lt;/g&gt;
+  &lt;path d=&quot;M440,255 H520&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;3&quot; marker-end=&quot;url(#arAccD)&quot;/&gt;
+  &lt;rect x=&quot;436&quot; y=&quot;146&quot; width=&quot;90&quot; height=&quot;17&quot; rx=&quot;4&quot; fill=&quot;var(--paper)&quot;/&gt;
+  &lt;text x=&quot;481&quot; y=&quot;158&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot; text-anchor=&quot;middle&quot;&gt;首 token&lt;/text&gt;
+  &lt;rect x=&quot;698&quot; y=&quot;146&quot; width=&quot;56&quot; height=&quot;17&quot; rx=&quot;4&quot; fill=&quot;var(--paper)&quot;/&gt;
+  &lt;text x=&quot;726&quot; y=&quot;158&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot; text-anchor=&quot;middle&quot;&gt;续写&lt;/text&gt;
+  &lt;rect x=&quot;438&quot; y=&quot;266&quot; width=&quot;86&quot; height=&quot;17&quot; rx=&quot;4&quot; fill=&quot;var(--paper)&quot;/&gt;
+  &lt;text x=&quot;481&quot; y=&quot;278&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot; text-anchor=&quot;middle&quot;&gt;KV Connector&lt;/text&gt;
+  &lt;rect x=&quot;812&quot; y=&quot;112&quot; width=&quot;82&quot; height=&quot;17&quot; rx=&quot;4&quot; fill=&quot;var(--paper)&quot;/&gt;
+  &lt;text x=&quot;853&quot; y=&quot;124&quot; style=&quot;font-family:var(--font-sans);font-size:10.5px;fill:var(--ink-3)&quot; text-anchor=&quot;middle&quot;&gt;SSE 流式&lt;/text&gt;
+  &lt;text x=&quot;100&quot; y=&quot;352&quot; style=&quot;font-family:var(--font-sans);font-size:11px;fill:var(--ink-3)&quot;&gt;多模态可再加 Encode 池，编码结果经 encoder cache 交给 Prefill。&lt;/text&gt;
+&lt;/svg&gt;
+```
+
+| 阶段 | 特点 | 资源倾向 |
+|---|---|---|
+| Prefill | 算力密集，处理长 prompt | 高算力，短时占用 |
+| Decode | 显存带宽密集，逐 token | 大显存，长时占用 |
+| Encode | 多模态编码，可独立扩缩 | 按图像负载弹性 |
+
+好处是 TTFT 和 TPOT 可以分开优化。代价是 KV 跨实例传输，多一个故障域。多模态还可以把 Encode 再拆出去，走独立的 encoder 传输通道。
 
 ## 调度器
 
