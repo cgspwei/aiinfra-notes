@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vLLM 架构与源码学习路线</title>
+<style>
+  :root{
+    --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --line:#e7e5e4;
+    --card:#ffffff; --accent:#2563eb; --accent-soft:#eff6ff;
+    --green:#16a34a; --green-soft:#f0fdf4;
+    --amber:#d97706; --amber-soft:#fffbeb;
+    --red:#dc2626; --red-soft:#fef2f2;
+    --code-bg:#f5f5f4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0c0a09; --fg:#e7e5e4; --muted:#a8a29e; --line:#292524;
+      --card:#1c1917; --accent:#60a5fa; --accent-soft:#172554;
+      --green:#4ade80; --green-soft:#052e16;
+      --amber:#fbbf24; --amber-soft:#2a1d05;
+      --red:#f87171; --red-soft:#2a0a0a;
+      --code-bg:#292524;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Segoe UI,sans-serif}
+  .layout{display:grid;grid-template-columns:240px minmax(0,1fr);max-width:1180px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 16px 28px 24px;
+    border-right:1px solid var(--line);font-size:14px}
+  nav .brand{font-weight:700;margin-bottom:14px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:4px 8px;border-radius:6px;margin:1px 0}
+  nav a:hover{background:var(--accent-soft);color:var(--accent)}
+  nav .sep{margin:12px 8px 4px;font-size:12px;color:var(--muted);letter-spacing:.06em}
+  main{padding:40px 36px 100px;min-width:0}
+  h1{font-size:2rem;margin:0 0 6px;line-height:1.3}
+  .sub{color:var(--muted);margin:0 0 28px}
+  h2{font-size:1.45rem;margin:52px 0 14px;padding-top:12px;border-top:1px solid var(--line)}
+  h3{font-size:1.1rem;margin:26px 0 8px}
+  p{margin:10px 0}
+  code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code-bg);
+    padding:1px 6px;border-radius:5px;word-break:break-word}
+  pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow:auto;border:1px solid var(--line)}
+  pre code{background:none;padding:0}
+  a{color:var(--accent)}
+  .callout{border-radius:10px;padding:12px 16px;margin:16px 0;border:1px solid var(--line)}
+  .callout.tip{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 35%,transparent)}
+  .callout.warn{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 35%,transparent)}
+  .callout.info{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+  .callout b.t{display:block;margin-bottom:2px}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14.5px;background:var(--card);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--code-bg);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .stage{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 22px 10px;margin:22px 0}
+  .stage-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+  .badge{background:var(--accent);color:#fff;border-radius:999px;font-size:13px;font-weight:700;padding:2px 12px}
+  .stage-head h3{margin:0}
+  .meta{color:var(--muted);font-size:13.5px}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;margin-right:4px;border:1px solid var(--line)}
+  .tag.must{background:var(--red-soft);color:var(--red)}
+  .tag.core{background:var(--accent-soft);color:var(--accent)}
+  .tag.opt{background:var(--green-soft);color:var(--green)}
+  ul,ol{padding-left:22px;margin:8px 0}
+  li{margin:4px 0}
+  .goal{border-left:3px solid var(--accent);padding:2px 12px;margin:10px 0;color:var(--fg)}
+  .q{border-left:3px solid var(--amber);padding:2px 12px;margin:10px 0}
+  /* pipeline diagram */
+  .pipe{display:flex;flex-direction:column;gap:0;margin:20px 0;font-size:14px}
+  .node{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 14px;
+    display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .node .n{font-weight:600}
+  .node .f{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+  .node.proc-a{border-left:4px solid #2563eb}
+  .node.proc-b{border-left:4px solid #d97706}
+  .node.proc-c{border-left:4px solid #16a34a}
+  .arrow{text-align:center;color:var(--muted);line-height:1.1;font-size:13px;padding:2px 0}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:4px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:10px 0}
+  summary{cursor:pointer;font-weight:600}
+  .check li{list-style:none;margin-left:-20px}
+  .check li::before{content:"☐ ";color:var(--muted)}
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr}
+    nav{display:none}
+    main{padding:24px 18px 80px}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav>
+  <div class="brand">vLLM 学习路线</div>
+  <a href="#principle">学习原则</a>
+  <a href="#prereq">前置知识</a>
+  <a href="#map">一张图看主线</a>
+  <div class="sep">主线阶段</div>
+  <a href="#s0">阶段 0 · 先建立直觉</a>
+  <a href="#s1">阶段 1 · 请求全流程</a>
+  <a href="#s2">阶段 2 · 调度器</a>
+  <a href="#s3">阶段 3 · KV Cache 管理</a>
+  <a href="#s4">阶段 4 · Worker 与 ModelRunner</a>
+  <a href="#s5">阶段 5 · 模型与 Attention</a>
+  <a href="#s6">阶段 6 · 采样与输出</a>
+  <div class="sep">进阶（按需）</div>
+  <a href="#adv">进阶专题</a>
+  <a href="#skip">可以先跳过的部分</a>
+  <div class="sep">方法</div>
+  <a href="#practice">动手与调试</a>
+  <a href="#checklist">自检清单</a>
+</nav>
+
+<main>
+<h1>vLLM 架构与源码学习路线</h1>
+<p class="sub">基于当前仓库 <code>vllm-project/vllm</code> main 分支的目录结构整理。所有路径均相对于仓库根目录，行号为撰写时的大致位置，随版本会漂移，请以函数名为准。</p>
+
+<div class="callout info">
+  <b class="t">一句话主线</b>
+  一个请求从 <b>入口 → 引擎核心 → 调度器 → KV Cache 块分配 → Worker → 模型前向 → 采样 → 回传</b>，
+  然后循环。只要把这个循环里每一步“谁负责、数据长什么样”弄清楚，vLLM 80% 的架构就清楚了。
+  其余 200+ 个模型文件、量化、LoRA、投机解码、CUDA kernel 都是围绕这条主线的“插件”。
+</div>
+
+<h2 id="principle">学习原则</h2>
+<ol>
+  <li><b>只看 <code>vllm/v1/</code>。</b>这是当前引擎实现，旧版 V0 已不是主线。</li>
+  <li><b>先流程，后细节。</b>每个文件第一遍只读类/函数签名和 docstring，不要逐行读。
+      <code>scheduler.py</code> 3700 行、<code>gpu_model_runner.py</code> 7100 行，从头读到尾是浪费。</li>
+  <li><b>带着问题读。</b>每个阶段下面都给了“读完应能回答”的问题，答不上来就回头。</li>
+  <li><b>用调试器/日志串线。</b>光读代码很容易迷路，用一个最小例子打断点走一遍（见<a href="#practice">动手与调试</a>）。</li>
+  <li><b>优先读 <code>docs/design/</code>。</b>官方设计文档比源码更适合建立整体图，再去源码里对号入座。</li>
+</ol>
+
+<div class="callout warn">
+  <b class="t">阅读时的心态</b>
+  代码里充斥着 DP/EP/PP、KV connector、LoRA、多模态、ubatch、fault tolerance 等分支。
+  第一遍遇到这些分支一律当成“暂时为空”，只跟最朴素的路径：<b>单卡、纯文本、不开任何高级特性</b>。
+</div>
+
+<h2 id="prereq">前置知识</h2>
+<p>需要一些，但<b>不必全部学完再开始</b>。分三档：必须有、最好有、按需补。</p>
+
+<h3>必须有（没有会读不下去）</h3>
+<table>
+  <tr><th>领域</th><th>具体内容</th></tr>
+  <tr><td><b>Python 工程能力</b></td>
+    <td>类、dataclass、类型注解、抽象基类（ABC）；装饰器、上下文管理器、生成器；
+      <code>asyncio</code>（读 <code>AsyncLLM</code>、API server 要用）；
+      多进程基础与进程间通信概念（前端 / EngineCore / Worker 是不同进程）</td></tr>
+  <tr><td><b>PyTorch 基础</b></td>
+    <td>Tensor 操作、索引、广播、<code>view/reshape</code>；<code>nn.Module</code>、<code>forward</code>、<code>state_dict</code>；
+      device / dtype / 显存概念；了解 <code>torch.compile</code> 与 CUDA Graph 是做什么的（不必会写）</td></tr>
+  <tr><td><b>Transformer 推理原理</b></td>
+    <td>Self-attention（Q、K、V、softmax、多头）；decoder-only 完整结构：Embedding → N × (Attention + MLP) → LM Head；
+      自回归生成；<b>KV Cache 为什么存在</b>——这是理解 vLLM 的起点</td></tr>
+</table>
+
+<h3>最好有（能显著加速理解）</h3>
+<ul>
+  <li><b>GQA / MQA</b>：现代模型几乎都用，直接影响 KV Cache 大小。</li>
+  <li><b>RoPE 位置编码</b>：模型代码里到处都是。</li>
+  <li><b>采样</b>：temperature、top-k、top-p、greedy 的区别。</li>
+  <li><b>GPU 基础</b>：显存 vs 算力；为什么 decode 是访存瓶颈；为什么增大 batch 能提高利用率。</li>
+  <li><b>并行策略概念</b>：数据并行、张量并行、流水线并行各自切什么；all-reduce 是什么（阶段 5 会用到）。</li>
+  <li><b>操作系统内存分页</b>：PagedAttention 就是这个思想的类比，有此背景理解 block table 会很快。</li>
+  <li><b>Linux 与命令行基础</b>：读日志、调试多进程程序。</li>
+</ul>
+
+<h3>按需再补（走到哪补到哪）</h3>
+<table>
+  <tr><th>想深入的方向</th><th>需要补的知识</th></tr>
+  <tr><td>写 kernel</td><td>CUDA 编程、Triton、GPU 内存层次、roofline 分析</td></tr>
+  <tr><td>量化</td><td>INT8 / FP8 / FP4 数值格式、GPTQ / AWQ 原理</td></tr>
+  <tr><td>MoE</td><td>专家路由、expert parallel、all-to-all 通信</td></tr>
+  <tr><td>编译优化</td><td><code>torch.compile</code>、FX graph、Inductor</td></tr>
+  <tr><td>投机解码</td><td>拒绝采样、draft model</td></tr>
+  <tr><td>分布式服务</td><td>NCCL、Ray、ZMQ、Kubernetes</td></tr>
+</table>
+
+<h3>三个自测问题</h3>
+<p>下面三个问题都能答个大概，就可以开始读源码了：</p>
+<ol>
+  <li>生成第 100 个 token 时，为什么不需要重新计算前 99 个 token 的 K 和 V？</li>
+  <li>多头注意力里，一个 <code>[batch, seq, hidden]</code> 的输入经过 QKV 投影后形状怎么变？</li>
+  <li>张量并行时，一个线性层的权重按行切和按列切，分别需要什么通信？</li>
+</ol>
+<p>答不上来，说明 Transformer 推理这一块需要先补。推荐资料：</p>
+<ul>
+  <li>Andrej Karpathy 的 <i>Let's build GPT</i>（从零实现 GPT，约 2 小时）</li>
+  <li>vLLM 原论文（对 KV Cache 问题讲得很清楚）</li>
+  <li><i>The Illustrated Transformer</i>（图解 Transformer）</li>
+</ul>
+
+<div class="callout tip"><b class="t">建议：不要在前置知识上花太久</b>
+  先补“必须有”的三项（已经具备就不用补），然后直接进入阶段 0–1，<b>遇到不懂的概念再回头查</b>。
+  vLLM 的概念密度很高，但每个都可以局部学习，没必要先成为 CUDA 专家再读。</div>
+
+<h2 id="map">一张图看主线</h2>
+<p>颜色代表所在进程：蓝色 = API / 前端进程，橙色 = EngineCore 进程，绿色 = Worker 进程（每张 GPU 一个）。</p>
+
+<div class="pipe">
+  <div class="node proc-a"><span class="n">① 入口：LLM / OpenAI API Server</span><span class="f">entrypoints/llm.py · entrypoints/openai/api_server.py</span></div>
+  <div class="arrow">↓ 文本 → token ids、封装成 Request</div>
+  <div class="node proc-a"><span class="n">② 前端引擎：LLMEngine / AsyncLLM + InputProcessor</span><span class="f">v1/engine/llm_engine.py · async_llm.py · input_processor.py</span></div>
+  <div class="arrow">↓ ZMQ（跨进程）</div>
+  <div class="node proc-b"><span class="n">③ EngineCore：忙循环 step()</span><span class="f">v1/engine/core.py</span></div>
+  <div class="arrow">↓ 每步先问调度器</div>
+  <div class="node proc-b"><span class="n">④ Scheduler：本步谁跑、各跑多少 token</span><span class="f">v1/core/sched/scheduler.py</span></div>
+  <div class="arrow">↕ 要块 / 释放块 / 前缀命中</div>
+  <div class="node proc-b"><span class="n">⑤ KVCacheManager + BlockPool：PagedAttention 的“页表”</span><span class="f">v1/core/kv_cache_manager.py · block_pool.py</span></div>
+  <div class="arrow">↓ SchedulerOutput</div>
+  <div class="node proc-b"><span class="n">⑥ Executor：把任务分发给各 Worker</span><span class="f">v1/executor/（uniproc / multiproc / ray）</span></div>
+  <div class="arrow">↓ RPC / 共享内存</div>
+  <div class="node proc-c"><span class="n">⑦ Worker + ModelRunner：准备输入张量、调用模型</span><span class="f">v1/worker/gpu_worker.py · gpu_model_runner.py</span></div>
+  <div class="arrow">↓</div>
+  <div class="node proc-c"><span class="n">⑧ 模型前向：Embedding → N × (Attention + MLP/MoE) → LM Head</span><span class="f">model_executor/models/ · model_executor/layers/ · v1/attention/</span></div>
+  <div class="arrow">↓ logits</div>
+  <div class="node proc-c"><span class="n">⑨ Sampler：温度 / top-p / 惩罚 / 结构化输出 / 投机验证</span><span class="f">v1/sample/sampler.py</span></div>
+  <div class="arrow">↓ ModelRunnerOutput → Scheduler.update_from_output() → 判断是否结束</div>
+  <div class="node proc-a"><span class="n">⑩ OutputProcessor：detokenize、流式回传</span><span class="f">v1/engine/output_processor.py · detokenizer.py</span></div>
+</div>
+<div class="legend">
+  <span><i style="background:#2563eb"></i>前端进程</span>
+  <span><i style="background:#d97706"></i>EngineCore 进程</span>
+  <span><i style="background:#16a34a"></i>Worker 进程</span>
+</div>
+
+<h2 id="s0">阶段 0 · 先建立直觉（不看代码）</h2>
+<div class="stage">
+  <div class="stage-head"><span class="badge">阶段 0</span><h3>理解 LLM 推理的三个事实</h3>
+    <span class="tag must">必学</span><span class="meta">建议 0.5–1 天</span></div>
+  <p>如果下面几个概念不清楚，读代码会一头雾水。</p>
+  <ul>
+    <li><b>Prefill 与 Decode</b>：prefill 一次处理整段 prompt（算力瓶颈）；decode 每次只生成 1 个 token（访存瓶颈）。</li>
+    <li><b>KV Cache</b>：每个已处理 token 的 K、V 都要保存，显存占用随序列长度线性增长，是 LLM 服务的核心资源。</li>
+    <li><b>为什么需要 PagedAttention 与 Continuous Batching</b>：显存碎片 + 请求长度不一，静态 batch 利用率极低。</li>
+  </ul>
+  <h3>阅读材料</h3>
+  <ul>
+    <li><code>README.md</code>、vLLM 论文（<i>Efficient Memory Management for Large Language Model Serving with PagedAttention</i>）</li>
+    <li><code>docs/design/paged_attention.md</code></li>
+    <li><code>docs/design/arch_overview.md</code>（官方架构总览，<b>最重要的一篇</b>）</li>
+    <li><code>docs/design/prefix_caching.md</code></li>
+  </ul>
+  <div class="goal"><b>目标：</b>能用自己的话画出“请求 → 调度 → 块分配 → 前向 → 采样”这张图。</div>
+  <div class="q"><b>读完应能回答：</b>为什么 vLLM 要把 KV Cache 切成固定大小的 block？block 表和操作系统页表有什么类比关系？</div>
+</div>
+
+<h2 id="s1">阶段 1 · 请求的全流程（骨架）</h2>
+<div class="stage">
+  <div class="stage-head"><span class="badge">阶段 1</span><h3>入口 → 引擎 → EngineCore</h3>
+    <span class="tag must">必学</span><span class="meta">建议 1–2 天</span></div>
+  <p>目的：搞清楚“一个请求从进来到出去经过了哪些对象”，以及进程是怎么划分的。</p>
+  <table>
+    <tr><th>顺序</th><th>文件</th><th>重点看什么</th></tr>
+    <tr><td>1</td><td><code>vllm/entrypoints/llm.py</code></td><td><code>LLM.generate()</code>：离线推理的最短路径，是最好的入口</td></tr>
+    <tr><td>2</td><td><code>vllm/v1/engine/llm_engine.py</code></td><td><code>add_request()</code>、<code>step()</code>：同步引擎外壳（约 530 行，可通读）</td></tr>
+    <tr><td>3</td><td><code>vllm/v1/engine/input_processor.py</code></td><td>prompt → tokenize → <code>EngineCoreRequest</code></td></tr>
+    <tr><td>4</td><td><code>vllm/v1/request.py</code></td><td><code>Request</code> 对象的状态字段，后面所有模块都围着它转</td></tr>
+    <tr><td>5</td><td><code>vllm/v1/engine/core_client.py</code></td><td>前端如何通过 ZMQ 与 EngineCore 进程通信</td></tr>
+    <tr><td>6</td><td><code>vllm/v1/engine/core.py</code></td><td><code>EngineCore.step()</code>（约 718 行）和 <code>EngineCoreProc.run_busy_loop()</code>（约 1730 行）</td></tr>
+    <tr><td>7</td><td><code>vllm/v1/outputs.py</code></td><td><code>ModelRunnerOutput</code>、<code>EngineCoreOutput</code>：各层之间传递的数据结构</td></tr>
+  </table>
+  <p>在线服务路径作为补充，等离线路径通了再看：</p>
+  <ul>
+    <li><code>vllm/entrypoints/openai/api_server.py</code>、<code>entrypoints/openai/chat_completion/</code></li>
+    <li><code>vllm/v1/engine/async_llm.py</code>：<code>AsyncLLM</code> 是异步版引擎，逻辑与 <code>LLMEngine</code> 对应</li>
+  </ul>
+  <div class="callout tip"><b class="t">技巧</b>
+    <code>EngineCore.step()</code> 非常短，本质只有三行：
+    <code>scheduler.schedule()</code> → <code>executor.execute_model()</code> → <code>scheduler.update_from_output()</code>。
+    抓住这个三拍子，就抓住了整个引擎。</div>
+  <div class="goal"><b>目标：</b>能说出前端进程、EngineCore 进程、Worker 进程各自的职责，以及它们之间传递的是哪几种消息。</div>
+  <div class="q"><b>读完应能回答：</b>为什么 tokenize/detokenize 放在前端进程，而不是 EngineCore？这样设计解决了什么问题？</div>
+</div>
+
+<h2 id="s2">阶段 2 · 调度器（最核心的一块）</h2>
+<div class="stage">
+  <div class="stage-head"><span class="badge">阶段 2</span><h3>Scheduler：continuous batching 的实现</h3>
+    <span class="tag must">必学</span><span class="meta">建议 2–3 天</span></div>
+  <p>调度器决定 vLLM 的吞吐与延迟特性，也是社区改动最频繁、最值得理解的部分。</p>
+  <table>
+    <tr><th>文件</th><th>重点看什么</th></tr>
+    <tr><td><code>v1/core/sched/interface.py</code></td><td>调度器接口，先看它定义了哪些方法（约 280 行）</td></tr>
+    <tr><td><code>v1/core/sched/output.py</code></td><td><code>SchedulerOutput</code> / <code>NewRequestData</code> / <code>CachedRequestData</code>：调度结果长什么样</td></tr>
+    <tr><td><code>v1/core/sched/request_queue.py</code></td><td>waiting 队列的策略（FCFS / 优先级）</td></tr>
+    <tr><td><code>v1/core/sched/scheduler.py</code></td><td>
+      <code>schedule()</code>（约 698 行）、<code>_preempt_request()</code>（约 1798 行）、<code>update_from_output()</code>（约 2252 行）</td></tr>
+  </table>
+  <h3><code>schedule()</code> 的阅读顺序</h3>
+  <ol>
+    <li>先只看“<b>running 队列</b>”部分：已在跑的请求每步再分配几个 token、是否需要新 block；</li>
+    <li>再看“<b>waiting 队列</b>”部分：新请求如何查前缀缓存、分配 block、受 <code>max_num_batched_tokens</code> 限制；</li>
+    <li>然后看<b>抢占</b>：显存不够时谁被踢出、怎么回到 waiting；</li>
+    <li>最后看 <b>chunked prefill</b>：长 prompt 如何被切成多步处理，与 decode 混合同一批。</li>
+  </ol>
+  <p><code>update_from_output()</code> 同样重要：模型跑完后，它负责追加新 token、判断停止条件（EOS / max_tokens / stop string）、释放已完成请求的 block。</p>
+  <div class="callout warn"><b class="t">别被分支吓到</b>
+    <code>scheduler.py</code> 里有大量 KV connector、编码器缓存、结构化输出、投机解码、DP 同步相关的分支。
+    第一遍遇到时扫一眼变量名、直接跳过。<code>async_scheduler.py</code> 和 <code>diffusion_scheduler.py</code> 也先不看。</div>
+  <div class="goal"><b>目标：</b>能手写一个 50 行的伪代码版 <code>schedule()</code>，包含 token budget、running/waiting 两个队列和抢占。</div>
+  <div class="q"><b>读完应能回答：</b>V1 调度器为什么不再区分 prefill 阶段和 decode 阶段，而统一用“每个请求本步要算多少 token”来描述？</div>
+</div>
+
+<h2 id="s3">阶段 3 · KV Cache 管理（PagedAttention 的“内存管理器”）</h2>
+<div class="stage">
+  <div class="stage-head"><span class="badge">阶段 3</span><h3>KVCacheManager / BlockPool / 前缀缓存</h3>
+    <span class="tag must">必学</span><span class="meta">建议 2 天</span></div>
+  <table>
+    <tr><th>文件</th><th>重点看什么</th></tr>
+    <tr><td><code>v1/kv_cache_interface.py</code></td><td>KV Cache 的规格描述（<code>KVCacheSpec</code> / <code>KVCacheConfig</code>）</td></tr>
+    <tr><td><code>v1/core/block_pool.py</code></td><td>
+      <code>KVCacheBlock</code>、空闲块队列、<code>get_new_blocks()</code>、<code>free_blocks()</code>、
+      <code>cache_full_blocks()</code>、<code>get_cached_block()</code></td></tr>
+    <tr><td><code>v1/core/kv_cache_manager.py</code></td><td>
+      <code>get_computed_blocks()</code>（前缀命中，约 266 行）、<code>allocate_slots()</code>（分配，约 379 行）</td></tr>
+    <tr><td><code>v1/core/single_type_kv_cache_manager.py</code></td><td>全注意力 / 滑窗 / Mamba 等不同层类型的块管理（先看 full attention 那一个类）</td></tr>
+    <tr><td><code>v1/core/kv_cache_utils.py</code></td><td>block hash 计算（前缀缓存的关键）</td></tr>
+    <tr><td><code>docs/design/prefix_caching.md</code></td><td>设计说明，建议与代码对着看</td></tr>
+  </table>
+  <p>需要弄懂的几个机制：</p>
+  <ul>
+    <li><b>block 是什么</b>：固定 token 数（如 16）的 KV 存储单元；请求拥有一个“block 列表”，类似页表。</li>
+    <li><b>引用计数 + LRU 空闲队列</b>：block 被释放后不会立即清除，而是进入可被复用的队列，下次命中前缀可“复活”。</li>
+    <li><b>block hash</b>：由“上一块 hash + 本块 token ids (+ 额外 key)”链式得到，实现跨请求的前缀共享。</li>
+  </ul>
+  <div class="callout tip"><b class="t">进阶但不必现在读</b>
+    <code>kv_cache_coordinator.py</code>、<code>docs/design/hybrid_kv_cache_manager.md</code> 处理“同一模型中不同层有不同注意力类型”的混合模型，
+    等主线通了再回来。</div>
+  <div class="goal"><b>目标：</b>能解释“两个请求共享相同 system prompt 时，第二个请求的 KV 是怎么被复用的”。</div>
+  <div class="q"><b>读完应能回答：</b>为什么只有“填满的 block”才会被缓存？抢占一个请求时它的 block 会发生什么？</div>
+</div>
+
+<h2 id="s4">阶段 4 · Worker 与 ModelRunner（从调度结果到 GPU）</h2>
+<div class="stage">
+  <div class="stage-head"><span class="badge">阶段 4</span><h3>Executor → Worker → ModelRunner</h3>
+    <span class="tag must">必学</span><span class="meta">建议 2–3 天</span></div>
+  <table>
+    <tr><th>文件</th><th>重点看什么</th></tr>
+    <tr><td><code>v1/executor/abstract.py</code></td><td>Executor 抽象接口（约 500 行）</td></tr>
+    <tr><td><code>v1/executor/uniproc_executor.py</code></td><td>单进程版，最简单，先看这个</td></tr>
+    <tr><td><code>v1/executor/multiproc_executor.py</code></td><td>多卡张量并行的实际执行器，之后再看</td></tr>
+    <tr><td><code>v1/worker/gpu_worker.py</code></td><td>
+      <code>init_device</code> / <code>load_model</code> / <code>determine_available_memory</code>（显存探测，决定 KV Cache 能开多大）/ <code>execute_model</code></td></tr>
+    <tr><td><code>v1/worker/gpu_model_runner.py</code></td><td>
+      <code>_update_states()</code>（约 1176 行）、<code>_prepare_inputs()</code>（约 1924 行）、
+      <code>_build_attention_metadata()</code>（约 2253 行）、<code>execute_model()</code>（约 3906 行）、
+      <code>sample_tokens()</code>（约 4260 行）</td></tr>
+    <tr><td><code>v1/worker/gpu_input_batch.py</code></td><td><code>InputBatch</code>：GPU 侧如何持久化一批请求的状态</td></tr>
+    <tr><td><code>v1/worker/block_table.py</code></td><td>每个请求的 block 表如何落到 GPU 张量上</td></tr>
+  </table>
+  <h3><code>execute_model()</code> 的核心逻辑</h3>
+  <ol>
+    <li><code>_update_states</code>：根据 <code>SchedulerOutput</code> 增删请求、更新 block 表；</li>
+    <li><code>_prepare_inputs</code>：把变长的多请求展平成一维 <code>input_ids / positions / slot_mapping</code>；</li>
+    <li><code>_build_attention_metadata</code>：生成 attention kernel 需要的元数据（seq_lens、block_table 等）；</li>
+    <li>调用模型 <code>forward</code>（可能被 CUDA Graph 包裹）→ 得到 hidden states；</li>
+    <li><code>sample_tokens</code>：取最后位置的 logits 并采样。</li>
+  </ol>
+  <div class="callout warn"><b class="t">注意：存在两套 ModelRunner</b>
+    <code>v1/worker/gpu_model_runner.py</code>（7000+ 行，历史实现）和 <code>v1/worker/gpu/model_runner.py</code>（Model Runner V2，重构版）。
+    建议先读 <code>docs/design/model_runner_v2.md</code> 了解新旧关系；学习概念时先读旧版（资料多），
+    读新版时重点看它如何把职责拆成更小的模块。</div>
+  <div class="goal"><b>目标：</b>能解释“为什么 batch 里的请求被展平成一维 token 序列，而不是 [batch, seq] 的二维张量”，以及 <code>slot_mapping</code> 的作用。</div>
+  <div class="q"><b>读完应能回答：</b>vLLM 启动时是如何确定 KV Cache 能占多少显存、能开多少个 block 的？（提示：profile run）</div>
+</div>
+
+<h2 id="s5">阶段 5 · 模型与 Attention（GPU 上真正算的东西）</h2>
+<div class="stage">
+  <div class="stage-head"><span class="badge">阶段 5</span><h3>模型定义、并行层、Attention 后端</h3>
+    <span class="tag core">核心</span><span class="meta">建议 2–3 天</span></div>
+  <p>读一个模型就够：<b>Llama</b>（或 Qwen3，结构类似）。其余 200 多个模型都是它的变体，不必逐个看。</p>
+  <table>
+    <tr><th>文件</th><th>重点看什么</th></tr>
+    <tr><td><code>model_executor/models/llama.py</code></td><td>约 585 行，可通读：<code>LlamaAttention</code> → <code>LlamaDecoderLayer</code> → <code>LlamaModel</code> → <code>LlamaForCausalLM</code></td></tr>
+    <tr><td><code>model_executor/layers/linear.py</code></td><td><code>ColumnParallelLinear</code> / <code>RowParallelLinear</code> / <code>QKVParallelLinear</code>：<b>张量并行就藏在这里</b></td></tr>
+    <tr><td><code>model_executor/layers/vocab_parallel_embedding.py</code></td><td>词表并行</td></tr>
+    <tr><td><code>model_executor/layers/attention/attention.py</code></td><td>模型侧的 <code>Attention</code> 层，是模型与后端的桥梁</td></tr>
+    <tr><td><code>v1/attention/backend.py</code> · <code>selector.py</code></td><td>Attention 后端抽象与选择逻辑</td></tr>
+    <tr><td><code>v1/attention/backends/flash_attn.py</code></td><td>最典型的后端实现，了解 metadata builder 与 kernel 调用即可</td></tr>
+    <tr><td><code>model_executor/models/registry.py</code></td><td>架构名 → 模型类的注册表（新增模型时用）</td></tr>
+    <tr><td><code>model_executor/model_loader/</code></td><td>权重加载（<code>load_weights</code> 的 stacked 参数映射是常见坑点）</td></tr>
+    <tr><td><code>distributed/parallel_state.py</code></td><td>TP/PP/DP/EP 通信组的创建与访问</td></tr>
+    <tr><td><code>docs/design/attention_backends.md</code></td><td>各后端的区别与选择依据</td></tr>
+  </table>
+  <div class="goal"><b>目标：</b>能说清 TP=2 时，QKV 投影和 MLP 的权重如何被切分、哪里需要 all-reduce。</div>
+  <div class="q"><b>读完应能回答：</b>Attention 层的 <code>forward</code> 在 prefill 和 decode 时调用的是同一个 kernel 吗？KV 是在什么时候写入 cache 的？</div>
+</div>
+
+<h2 id="s6">阶段 6 · 采样与输出回传（闭环）</h2>
+<div class="stage">
+  <div class="stage-head"><span class="badge">阶段 6</span><h3>Sampler 与 OutputProcessor</h3>
+    <span class="tag core">核心</span><span class="meta">建议 1 天</span></div>
+  <table>
+    <tr><th>文件</th><th>重点看什么</th></tr>
+    <tr><td><code>sampling_params.py</code></td><td>用户可配置的采样参数全集</td></tr>
+    <tr><td><code>v1/sample/sampler.py</code></td><td>约 500 行：logits 处理 → 温度 → top-k/top-p → 采样；greedy 与 random 的分支</td></tr>
+    <tr><td><code>v1/sample/metadata.py</code></td><td><code>SamplingMetadata</code>：把每个请求的采样参数批量化</td></tr>
+    <tr><td><code>v1/engine/output_processor.py</code></td><td>EngineCore 输出 → 用户可见的 <code>RequestOutput</code>，处理流式、停止字符串</td></tr>
+    <tr><td><code>v1/engine/detokenizer.py</code></td><td>增量 detokenize（避免 UTF-8 字符被拆开）</td></tr>
+  </table>
+  <p>到这里回头把阶段 1 的三拍子 <code>schedule → execute_model → update_from_output</code> 重新走一遍，主线就闭合了。</p>
+  <div class="callout tip"><b class="t">里程碑</b>
+    完成阶段 0–6 后，你已经具备阅读 PR、定位大部分 issue、以及贡献简单修复的能力。
+    建议此时用一个真实的小 PR（比如 bugfix 类）练手，再决定往哪个方向深入。</div>
+</div>
+
+<h2 id="adv">进阶专题（主线通了再按兴趣选）</h2>
+<p>下面的专题彼此独立，按你的目标选 1–2 个深入即可。</p>
+<table>
+  <tr><th>方向</th><th>适合谁</th><th>入口</th></tr>
+  <tr><td><b>性能优化 / 编译</b></td><td>想做性能的人</td>
+    <td><code>docs/design/torch_compile.md</code>、<code>cuda_graphs.md</code>、<code>vllm/compilation/</code>、<code>vllm/config/vllm.py</code>（<code>CompilationConfig</code>）</td></tr>
+  <tr><td><b>GPU Kernel</b></td><td>想写 CUDA/Triton 的人</td>
+    <td><code>csrc/attention/</code>、<code>vllm/_custom_ops.py</code>、<code>model_executor/layers/fused_moe/</code>、<code>docs/design/custom_op.md</code></td></tr>
+  <tr><td><b>量化</b></td><td>关心显存/成本</td>
+    <td><code>model_executor/layers/quantization/</code>（先读 <code>fp8.py</code>）</td></tr>
+  <tr><td><b>MoE 与并行</b></td><td>大模型部署</td>
+    <td><code>fused_moe/</code>、<code>docs/design/fused_moe_modular_kernel.md</code>、<code>docs/design/dbo.md</code>、<code>distributed/</code></td></tr>
+  <tr><td><b>投机解码</b></td><td>低延迟场景</td>
+    <td><code>v1/spec_decode/</code>（先 <code>ngram_proposer.py</code>，再 <code>eagle.py</code>）、<code>v1/sample/rejection_sampler.py</code></td></tr>
+  <tr><td><b>PD 分离 / KV 传输</b></td><td>大规模服务</td>
+    <td><code>v1/kv_offload/</code>、<code>docs/design/nixl_kv_*.md</code>、<code>examples/disaggregated/</code></td></tr>
+  <tr><td><b>结构化输出 / 工具调用</b></td><td>Agent 应用</td>
+    <td><code>v1/structured_output/</code>、<code>vllm/tool_parsers/</code>、<code>vllm/reasoning/</code></td></tr>
+  <tr><td><b>多模态</b></td><td>VLM 方向</td>
+    <td><code>docs/design/mm_processing.md</code>、<code>vllm/multimodal/</code>、<code>v1/core/encoder_cache_manager.py</code></td></tr>
+  <tr><td><b>LoRA</b></td><td>多租户微调服务</td>
+    <td><code>vllm/lora/</code>、<code>v1/worker/lora_model_runner_mixin.py</code></td></tr>
+  <tr><td><b>新硬件 / 插件</b></td><td>适配新芯片</td>
+    <td><code>vllm/platforms/</code>、<code>docs/design/plugin_system.md</code></td></tr>
+</table>
+
+<h2 id="skip">可以先跳过的部分</h2>
+<p>这些内容体量大，但对理解主线帮助很小。需要时再查。</p>
+<table>
+  <tr><th>内容</th><th>原因</th></tr>
+  <tr><td><code>model_executor/models/</code> 下除 Llama/Qwen3 之外的几百个模型文件</td><td>结构大同小异，遇到具体模型时对比 llama.py 看差异即可</td></tr>
+  <tr><td><code>entrypoints/</code> 下 anthropic / cohere / grpc / mcp / speech_to_text / pooling 等</td><td>只是不同协议的外壳，核心引擎相同</td></tr>
+  <tr><td><code>vllm/v1/attention/backends/</code> 下除 <code>flash_attn.py</code> 外的 30 多个后端</td><td>多为特定硬件/模型的变体（ROCm、Mamba、MLA、各类量化 attention）</td></tr>
+  <tr><td><code>v1/fault_tolerance</code>、<code>watermarking</code>、<code>hisparse</code>、<code>simple_kv_offload</code></td><td>特定特性，非主路径</td></tr>
+  <tr><td><code>vllm/benchmarks/</code>、<code>collect_env.py</code>、<code>usage/</code>、<code>tracing/</code></td><td>工具类</td></tr>
+  <tr><td><code>*_xpu_ops.py</code>、<code>_aiter_ops.py</code>、<code>rocm_*</code>、<code>cute_utils</code>、<code>tilelang_utils</code></td><td>特定硬件/编译器相关，学 CUDA 主路径足够</td></tr>
+  <tr><td><code>vllm/ir</code>、<code>compilation/passes</code></td><td>属于编译优化专题，先不碰</td></tr>
+  <tr><td><code>rust/</code></td><td>Rust 前端，与 Python 引擎并行的另一条实现路线</td></tr>
+  <tr><td>多种 DP/EP/ubatch/DBO 相关分支</td><td>读主线时把它们当作“不开启”即可</td></tr>
+</table>
+
+<h2 id="practice">动手与调试：把读代码变成“走一遍”</h2>
+
+<h3>1. 最小可运行例子</h3>
+<pre><code>uv venv --python 3.12 &amp;&amp; source .venv/bin/activate
+VLLM_USE_PRECOMPILED=1 uv pip install -e . --torch-backend=auto
+
+# 选一个小模型（如 Qwen/Qwen3-0.6B 或 facebook/opt-125m）
+.venv/bin/python - &lt;&lt;'EOF'
+from vllm import LLM, SamplingParams
+llm = LLM("Qwen/Qwen3-0.6B", enforce_eager=True)   # eager 方便调试
+print(llm.generate(["Hello, my name is"], SamplingParams(max_tokens=16)))
+EOF</code></pre>
+
+<div class="callout info"><b class="t">没有 GPU 怎么办</b>
+  可以只读代码配合文档；或用 CPU 后端 / 云上 GPU 实例跑最小例子。本机（macOS）通常无法直接运行 CUDA 路径，建议只在远端机器上做运行验证。</div>
+
+<h3>2. 方便读懂流程的开关</h3>
+<ul>
+  <li><code>enforce_eager=True</code>：关闭 CUDA Graph 与编译，调用栈干净，便于断点。</li>
+  <li><code>VLLM_ENABLE_V1_MULTIPROCESSING=0</code>：让 EngineCore 与前端同进程，可以直接用 pdb/IDE 单步（若当前版本仍支持，请以 <code>vllm/envs.py</code> 为准）。</li>
+  <li><code>VLLM_LOGGING_LEVEL=DEBUG</code>：打印调度、块分配等日志。</li>
+  <li><code>tensor_parallel_size=1</code>，关闭 prefix caching / chunked prefill 做第一遍，再逐个打开对比差异。</li>
+</ul>
+
+<h3>3. 推荐的 5 个断点</h3>
+<ol>
+  <li><code>LLM.generate</code> —— 入口</li>
+  <li><code>EngineCore.step</code> —— 每一步的起点</li>
+  <li><code>Scheduler.schedule</code> —— 观察 <code>SchedulerOutput</code> 内容</li>
+  <li><code>KVCacheManager.allocate_slots</code> —— 观察 block 分配</li>
+  <li><code>GPUModelRunner.execute_model</code> —— 观察展平后的 <code>input_ids</code> 与 <code>slot_mapping</code></li>
+</ol>
+
+<h3>4. 三个小实验</h3>
+<ol>
+  <li><b>前缀缓存实验：</b>连续发送两个共享长前缀的请求，观察第二次的 <code>num_computed_tokens</code> 与缓存命中日志。</li>
+  <li><b>抢占实验：</b>把 <code>gpu_memory_utilization</code> 调得很低、并发调高，观察抢占日志。</li>
+  <li><b>chunked prefill 实验：</b>把 <code>max_num_batched_tokens</code> 调小，用长 prompt，观察 prefill 被拆成多步。</li>
+</ol>
+
+<h3>5. 配套的官方资料</h3>
+<ul>
+  <li><code>docs/design/</code> 下的设计文档（本路线中已按阶段穿插）</li>
+  <li><code>docs/contributing/</code>：贡献流程与 <code>incremental_build.md</code></li>
+  <li><code>tests/v1/core/</code>（调度器/KV 管理的单测）：<b>测试往往是理解模块行为最快的方式</b></li>
+  <li><a href="https://blog.vllm.ai/">vLLM 官方博客</a>：多篇文章讲解 V1 架构重构与各项特性</li>
+</ul>
+
+<h2 id="checklist">学完自检清单</h2>
+<ul class="check">
+  <li>能画出从 <code>LLM.generate()</code> 到 token 返回的完整数据流，并标出三类进程。</li>
+  <li>能解释 <code>schedule → execute_model → update_from_output</code> 三拍子各自做了什么。</li>
+  <li>能说出 token budget、running/waiting、抢占、chunked prefill 之间的关系。</li>
+  <li>能解释 block、block table、slot_mapping、block hash 分别是什么。</li>
+  <li>能解释前缀缓存命中时，哪些计算被跳过了。</li>
+  <li>能读懂 <code>llama.py</code>，并说明 TP 切分发生在哪些层。</li>
+  <li>能说清启动阶段如何探测显存并确定 KV Cache 大小。</li>
+  <li>能在一个新 issue 中，大致判断问题出在“前端 / 调度 / KV 管理 / 模型 / kernel”哪一层。</li>
+</ul>
+
+<h2>建议的总时间安排</h2>
+<table>
+  <tr><th>阶段</th><th>内容</th><th>估计耗时</th></tr>
+  <tr><td>0</td><td>概念与官方设计文档</td><td>0.5–1 天</td></tr>
+  <tr><td>1</td><td>请求全流程骨架</td><td>1–2 天</td></tr>
+  <tr><td>2</td><td>调度器</td><td>2–3 天</td></tr>
+  <tr><td>3</td><td>KV Cache 管理</td><td>2 天</td></tr>
+  <tr><td>4</td><td>Worker 与 ModelRunner</td><td>2–3 天</td></tr>
+  <tr><td>5</td><td>模型与 Attention</td><td>2–3 天</td></tr>
+  <tr><td>6</td><td>采样与输出</td><td>1 天</td></tr>
+  <tr><td colspan="2"><b>主线合计</b></td><td><b>约 2–3 周（业余时间）</b></td></tr>
+</table>
+
+<p class="meta" style="margin-top:40px">注：vLLM 迭代很快，函数行号与文件组织会变化；遇到对不上的情况，请用 <code>grep -n "def schedule"</code> 之类的方式按函数名重新定位，并优先以 <code>docs/design/</code> 为准。</p>
+</main>
+</div>
+</body>
+</html>

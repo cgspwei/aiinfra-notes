@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PyTorch 构建系统深度解析 · 多语言大型系统的一个工程样本</title>
+<style>
+  :root{
+    --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --line:#e7e5e4;
+    --card:#ffffff; --accent:#2563eb; --accent-soft:#eff6ff;
+    --green:#16a34a; --green-soft:#f0fdf4;
+    --amber:#d97706; --amber-soft:#fffbeb;
+    --red:#dc2626; --red-soft:#fef2f2;
+    --violet:#7c3aed; --violet-soft:#f5f3ff;
+    --code-bg:#f5f5f4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0c0a09; --fg:#e7e5e4; --muted:#a8a29e; --line:#292524;
+      --card:#1c1917; --accent:#60a5fa; --accent-soft:#172554;
+      --green:#4ade80; --green-soft:#052e16;
+      --amber:#fbbf24; --amber-soft:#2a1d05;
+      --red:#f87171; --red-soft:#2a0a0a;
+      --violet:#a78bfa; --violet-soft:#1e1b4b;
+      --code-bg:#292524;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Segoe UI,sans-serif}
+  .layout{display:grid;grid-template-columns:250px minmax(0,1fr);max-width:1200px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 16px 40px 24px;
+    border-right:1px solid var(--line);font-size:14px}
+  nav .brand{font-weight:700;margin-bottom:6px;line-height:1.4}
+  nav .brand small{display:block;color:var(--muted);font-weight:400;font-size:12px;margin-top:2px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:3px 8px;border-radius:6px;margin:1px 0}
+  nav a:hover{background:var(--accent-soft);color:var(--accent)}
+  nav .sep{margin:14px 8px 4px;font-size:11.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  main{padding:40px 40px 120px;min-width:0}
+  h1{font-size:2rem;margin:0 0 6px;line-height:1.3}
+  .sub{color:var(--muted);margin:0 0 24px}
+  h2{font-size:1.45rem;margin:56px 0 14px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:1.12rem;margin:26px 0 8px}
+  h4{font-size:.96rem;margin:20px 0 6px;color:var(--muted);letter-spacing:.02em}
+  p{margin:10px 0}
+  code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code-bg);
+    padding:1px 6px;border-radius:5px;word-break:break-word}
+  pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow:auto;border:1px solid var(--line);font-size:13px}
+  pre code{background:none;padding:0}
+  a{color:var(--accent)}
+  .callout{border-radius:10px;padding:12px 16px;margin:16px 0;border:1px solid var(--line)}
+  .callout.tip{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 35%,transparent)}
+  .callout.warn{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 35%,transparent)}
+  .callout.info{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+  .callout.bad{background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 35%,transparent)}
+  .callout b.t{display:block;margin-bottom:2px}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14.5px;background:var(--card);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--code-bg);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  ul,ol{padding-left:22px;margin:8px 0}
+  li{margin:4px 0}
+  .path{display:inline-block;font:12.5px/1.5 ui-monospace,Menlo,monospace;background:var(--code-bg);
+    padding:1px 7px;border-radius:5px;margin:1px 0}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;margin-right:4px;border:1px solid var(--line)}
+  .tag.must{background:var(--red-soft);color:var(--red)}
+  .tag.core{background:var(--accent-soft);color:var(--accent)}
+  .tag.opt{background:var(--green-soft);color:var(--green)}
+
+  /* layer diagram */
+  .stack{margin:18px 0;display:flex;flex-direction:column;gap:8px}
+  .lyr{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px 16px;
+    display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:start}
+  .lyr .name{font-weight:700;font-size:14px}
+  .lyr .name small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
+  .lyr .desc{font-size:14px}
+  .lyr .desc code{font-size:12.5px}
+  .lyr.l0{border-left:4px solid #2563eb}
+  .lyr.l1{border-left:4px solid #7c3aed}
+  .lyr.l2{border-left:4px solid #d97706}
+  .lyr.l3{border-left:4px solid #16a34a}
+  .lyr.l4{border-left:4px solid #dc2626}
+  .lyr.l5{border-left:4px solid #0891b2}
+
+  /* pipeline */
+  .pipe{display:flex;flex-direction:column;gap:0;margin:18px 0;font-size:14px}
+  .pnode{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 14px;
+    display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pnode .n{font-weight:600}
+  .pnode .f{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+  .parrow{text-align:center;color:var(--muted);line-height:1.1;font-size:13px;padding:2px 0}
+  .pnode.step-a{border-left:4px solid var(--accent)}
+  .pnode.step-b{border-left:4px solid var(--violet)}
+  .pnode.step-c{border-left:4px solid var(--amber)}
+  .pnode.step-d{border-left:4px solid var(--green)}
+
+  /* law cards */
+  .laws{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+  .law{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .law .num{font:700 12px/1 ui-monospace,Menlo,monospace;color:var(--accent);letter-spacing:.08em}
+  .law h4{margin:6px 0 4px;color:var(--fg);font-size:.98rem}
+  .law p{margin:4px 0;font-size:14px;color:var(--muted)}
+  .law p b{color:var(--fg)}
+
+  details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:10px 0}
+  details[open]{padding-bottom:12px}
+  summary{cursor:pointer;font-weight:600;font-size:14.5px}
+  summary::marker{color:var(--muted)}
+  .a{color:var(--muted);margin:0 0 10px}
+  .a b{color:var(--fg)}
+  .mini{font-size:13px;color:var(--muted)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr}
+    nav{display:none}
+    main{padding:24px 18px 80px}
+    .cols,.laws{grid-template-columns:1fr}
+    .lyr{grid-template-columns:1fr;gap:4px}
+  }
+  @media print{
+    nav{display:none}.layout{display:block}main{padding:0}
+    .lyr,.pnode,.law{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav>
+  <div class="brand">PyTorch 构建系统<small>多语言大型系统样本</small></div>
+  <a href="#why">为什么值得研究</a>
+  <a href="#overview">全景：一次安装的 9 个阶段</a>
+  <a href="#layers">分层与职责边界</a>
+  <div class="sep">逐层拆解</div>
+  <a href="#pip">pip 与 Python 打包标准</a>
+  <a href="#pyproject">pyproject.toml 逐段读</a>
+  <a href="#scikit">scikit-build-core</a>
+  <a href="#cmake">CMake 的角色</a>
+  <a href="#ninja">Ninja 与增量构建</a>
+  <a href="#codegen">代码生成 torchgen</a>
+  <a href="#matrix">多后端与平台矩阵</a>
+  <a href="#devrel">开发态 vs 发布态</a>
+  <a href="#ci">CI 与可复现性</a>
+  <div class="sep">实践</div>
+  <a href="#debug">分层排错手册</a>
+  <a href="#lessons">10 条可迁移的架构经验</a>
+  <a href="#labs">动手实验</a>
+  <a href="#quiz">自测题</a>
+  <a href="#appendix">命令速查</a>
+</nav>
+
+<main>
+<h1>PyTorch 构建系统深度解析</h1>
+<p class="sub">
+  一条 <code>pip install -e .</code> 背后，是 Python 打包标准、CMake、Ninja、代码生成器、编译器、C++ ABI
+  和五种加速后端的协同。本文基于本仓库（<code>version.txt</code> = <code>2.16.0a0</code>，HEAD <code>5a98911762f</code>）的真实配置写成，
+  目标有两个：<b>看懂 PyTorch 怎么构建</b>，以及<b>提炼出可用于设计同类多语言系统的经验</b>。
+</p>
+
+<div class="callout info">
+  <b class="t">先给结论</b>
+  PyTorch 的构建系统不是一个工具，而是 <b>七层职责明确的流水线</b>：
+  <code>pip</code>（驱动）→ <code>scikit-build-core</code>（适配）→ <code>CMake</code>（编排）→
+  <code>torchgen</code>（生成）→ <code>Ninja</code>（执行）→ <code>clang/nvcc</code>（编译）→ 安装布局（打包）。
+  每一层只解决一个维度的问题，层与层之间用标准接口（PEP 517、CMake cache、.ninja 依赖图）连接。
+  <b>它复杂，但不混乱；这是本文最想让你带走的东西。</b>
+</div>
+
+<h2 id="why">为什么值得研究</h2>
+<p>大多数项目的构建系统是「能跑就行」。PyTorch 的构建系统被迫解决一系列真实约束，这些约束在任何大型多语言项目里都会重现：</p>
+<table>
+  <tr><th>约束</th><th>PyTorch 的应对</th><th>可迁移性</th></tr>
+  <tr><td>两种语言、两种迭代速度（C++ 慢、Python 快）</td><td>分层 + 可编辑安装的重定向模式</td><td>任何 C++/Python、Rust/Python、Go/Python 混合项目</td></tr>
+  <tr><td>算子数量爆炸（数千个），且要跨 8 个后端</td><td>YAML 单一事实来源 + 代码生成</td><td>任何「大量同构接口」的系统（RPC、ORM、硬件抽象）</td></tr>
+  <tr><td>构建一次要几十分钟</td><td>Ninja + ccache/sccache + 增量 + 并行度控制</td><td>所有大型 C++ 项目</td></tr>
+  <tr><td>同一份代码要产出 pip wheel、libtorch、移动端、多平台</td><td>构建选项矩阵 + 安装布局抽象</td><td>任何多形态交付的产品</td></tr>
+  <tr><td>社区贡献者环境千差万别</td><td>环境变量集中转发 + Summary 打印最终配置</td><td>任何需要「用户自助排错」的开源项目</td></tr>
+  <tr><td>CI 要在几十种镜像上跑</td><td>Docker 镜像内容哈希 + 统一构建脚本</td><td>任何多平台 CI</td></tr>
+</table>
+
+<h2 id="overview">全景：一次安装的 9 个阶段</h2>
+<p>这些阶段不是我总结的，是 <span class="path">CMakeLists.txt</span> 开头的官方注释里写好的，顺序就是执行顺序：</p>
+
+<div class="pipe">
+  <div class="pnode step-a"><span class="n">1. Bootstrap</span><span class="f">forward toolchain env → project() → EnvVarForwarding.cmake</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-a"><span class="n">2. Pre-build</span><span class="f">cmake/PreBuildSteps.cmake — 子模块初始化与校验、拉取 pinned NCCL</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-b"><span class="n">3. Options</span><span class="f">声明所有 USE_* / BUILD_* 开关（新增必须同步 Summary.cmake）</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-b"><span class="n">4. Dependencies</span><span class="f">cmake/Dependencies.cmake — 找或建第三方库，配置 CUDA/ROCm/XPU 工具链</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-c"><span class="n">5. Code generation</span><span class="f">torchgen 生成 ATen 头/源；generate_code.py 生成 autograd 与 Python 绑定</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-c"><span class="n">6. Main build</span><span class="f">c10 → torch_cpu → torch_cuda/hip/xpu → torch → torch_python</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-d"><span class="n">7. Export &amp; extras</span><span class="f">Caffe2Config.cmake / Targets；可选 binaries、JNI</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-d"><span class="n">8. Python packaging</span><span class="f">FileMirroring、PackageData、PostBuildSteps（合并 compile_commands、头文件包装）</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-d"><span class="n">9. Summary</span><span class="f">cmake/Summary.cmake — 打印最终解析出的配置</span></div>
+</div>
+
+<div class="callout tip">
+  <b class="t">读构建日志的正确姿势</b>
+  <code>-v</code> 输出里，这 9 个阶段有清晰的边界。遇到失败先问：<b>它死在第几阶段？</b>
+  第 1–4 阶段是「环境问题」，第 5 阶段是「schema/代码生成问题」，第 6 阶段是「代码问题」，
+  第 7–8 阶段是「打包/布局问题」。定位阶段比读最后一行报错有效得多。
+</div>
+
+<h2 id="layers">分层与职责边界</h2>
+
+<div class="stack">
+  <div class="lyr l0">
+    <div class="name">L0 · 驱动<small>pip</small></div>
+    <div class="desc">读取 <code>pyproject.toml</code>，按 PEP 517 调用构建后端，管理构建隔离，最后把产物装进环境。<b>它不编译任何东西。</b></div>
+  </div>
+  <div class="lyr l1">
+    <div class="name">L1 · 适配<small>scikit-build-core</small></div>
+    <div class="desc">把 CMake 包装成 PEP 517 后端：注入 <code>SKBUILD_*</code> 变量、把构建选项翻译成 CMake cache、生成 editable 重定向、组装 wheel。版本要求 <code>&gt;=1.1.1</code>。</div>
+  </div>
+  <div class="lyr l2">
+    <div class="name">L2 · 编排<small>CMake</small></div>
+    <div class="desc">发现依赖、声明选项、组织 target、生成构建文件、安装规则。真正的「构建系统」在这一层。入口 <span class="path">CMakeLists.txt</span>。</div>
+  </div>
+  <div class="lyr l3">
+    <div class="name">L3 · 生成<small>torchgen</small></div>
+    <div class="desc">用 Python 读 YAML，生成 C++ 头/源、Python 绑定、类型存根。它是<b>构建的一部分</b>，不是独立工具。</div>
+  </div>
+  <div class="lyr l4">
+    <div class="name">L4 · 执行<small>Ninja</small></div>
+    <div class="desc">按依赖图并行调度编译与链接；复用 <code>.o</code>、记录 <code>.ninja_deps</code>、支持 ccache/sccache 包装。</div>
+  </div>
+  <div class="lyr l5">
+    <div class="name">L5 · 编译<small>clang / gcc / nvcc / hipcc</small></div>
+    <div class="desc">把 C++/CUDA 变成目标文件。这一层的差异（ABI、C++ 标准、arch）是跨平台问题的主要来源。</div>
+  </div>
+  <div class="lyr l0">
+    <div class="name">L6 · 布局<small>install rules</small></div>
+    <div class="desc">决定产物落在 <code>torch/lib</code>、<code>torch/include</code>，设置 rpath，包装 stable-ABI 头文件，组装 wheel。</div>
+  </div>
+</div>
+
+<div class="callout warn">
+  <b class="t">边界为什么重要</b>
+  PyTorch 的很多设计决定，本质是在维护这条边界：<br>
+  · CMake <b>不</b>负责「用户怎么安装」，只负责「产物长什么样」。<br>
+  · pip <b>不</b>知道 C++，只认 wheel 与 PEP 517 接口。<br>
+  · torchgen <b>不</b>参与编译，只产出可编译的文本。<br>
+  · Ninja <b>不</b>理解语义，只认文件依赖。<br>
+  一旦某层越界（例如让 CMake 去猜 pip 的安装路径），系统就会变得脆弱。仓库里专门有断言防止这种越界（见下文 <code>install-dir</code> 的检查）。
+</div>
+
+<h2 id="pip">pip 与 Python 打包标准</h2>
+
+<h3>pip 到底做了什么</h3>
+<ol>
+  <li>解析命令行与包元数据。</li>
+  <li>（默认）创建<b>构建隔离环境</b>，安装 <code>[build-system].requires</code>。</li>
+  <li>调用 <code>build-backend</code> 的 <code>build_wheel</code> / <code>build_editable</code>。</li>
+  <li>拿到 <code>.whl</code>，解压到 <code>site-packages</code>，写 <code>RECORD</code>、<code>direct_url.json</code>。</li>
+  <li>解析并安装运行时依赖。</li>
+</ol>
+<p><b>pip 是包管理器，不是构建系统。</b>它只认 PEP 517 的三个钩子函数。PyTorch 把真正的构建全部藏在后端里。</p>
+
+<h3>相关的 Python 标准</h3>
+<table>
+  <tr><th>PEP</th><th>定义了</th><th>在 PyTorch 里的体现</th></tr>
+  <tr><td>518</td><td><code>[build-system]</code> 表与 <code>requires</code></td><td>那 6 个构建依赖</td></tr>
+  <tr><td>517</td><td>构建后端接口（<code>build_wheel</code> 等）</td><td><code>build-backend = "scikit_build_core.build"</code></td></tr>
+  <tr><td>621</td><td><code>[project]</code> 元数据</td><td>name、version、requires-python、license</td></tr>
+  <tr><td>660</td><td>可编辑安装（editable）</td><td><code>pip install -e .</code> 走的钩子</td></tr>
+  <tr><td>427</td><td>wheel 格式</td><td>最终产物的目录结构</td></tr>
+  <tr><td>440</td><td>版本号规范</td><td><code>2.16.0a0</code> 里的 <code>a0</code></td></tr>
+  <tr><td>639</td><td>license 表达式与 <code>license-files</code></td><td>pyproject 里那串 SPDX 表达式</td></tr>
+</table>
+
+<h3>构建隔离：为什么默认开，PyTorch 为什么要关</h3>
+<div class="cols">
+  <div>
+    <h4>默认行为（隔离）</h4>
+    <pre><code>pip install .
+# 1. 建临时 venv
+# 2. 装 [build-system].requires
+# 3. 在里面构建
+# 4. 丢弃临时环境</code></pre>
+    <p class="mini">优点：可复现、不受当前环境污染。缺点：每次重装依赖；看不到你环境里的 cmake/ninja/CUDA。</p>
+  </div>
+  <div>
+    <h4>PyTorch 的选择（不隔离）</h4>
+    <pre><code>pip install -e . -v --no-build-isolation
+# 直接用当前 venv
+# 构建依赖必须预装</code></pre>
+    <p class="mini">原因：numpy ABI 必须与运行时一致；要用环境里的 cmake/ninja/编译器/CUDA toolkit；构建太慢，无法承受重复装依赖。</p>
+  </div>
+</div>
+<div class="callout bad">
+  <b class="t">代价要记住</b>
+  关掉隔离后，<code>pip</code> <b>不会</b>替你装那些依赖。缺 <code>numpy</code>、<code>scikit-build-core</code>、<code>six</code> 时，
+  报错发生在构建后端导入阶段，看起来和「编译失败」完全不同。这就是分层排错的意义。
+</div>
+
+<h3>editable 的三种实现，以及 PyTorch 为什么选第三种</h3>
+<table>
+  <tr><th>方式</th><th>做法</th><th>问题</th></tr>
+  <tr><td>路径注入</td><td>往 <code>site-packages</code> 放一个 <code>.pth</code> 指向源码目录</td><td>只对纯 Python 有效；编译产物仍需另找位置</td></tr>
+  <tr><td>符号链接</td><td>把包目录链到源码</td><td>跨平台差；构建产物会污染源码树</td></tr>
+  <tr><td><b>重定向（redirect）</b></td><td>安装一个 import hook：<code>.py</code> 指向源码，扩展模块指向持久构建目录</td><td>实现复杂，但能同时满足「Python 热改」与「C++ 产物隔离」</td></tr>
+</table>
+<p>PyTorch 的配置（<span class="path">pyproject.toml</span>）：</p>
+<pre><code>[tool.scikit-build.editable]
+mode = "redirect"
+rebuild = false
+rebuild-dir = "build/install/{wheel_tag}"</code></pre>
+<p>这里有两个值得学的决定：</p>
+<ul>
+  <li><b>产物放进持久目录</b> <code>build/install/{wheel_tag}</code>。注释写明：否则每次安装都要把几 GB 压缩进 wheel 再解压，debug 构建要几分钟。</li>
+  <li><b>不在 import 时自动重建</b>。注释给了实测数据：否则每次 <code>import torch</code> 会跑约 7 次 cmake/ninja、多花约 25 秒。<b>把「何时重建」的决定权交回给用户</b>，而不是藏进 import。</li>
+</ul>
+<div class="callout tip">
+  <b class="t">设计启示</b>
+  「开发态」和「发布态」是两种不同的产物，不应该共用一个安装模型。
+  开发态追求<b>反馈延迟最小</b>，发布态追求<b>可分发、可复现</b>。用 mode 开关区分，而不是靠文档告诉用户「记得重新装」。
+</div>
+
+<h2 id="pyproject">pyproject.toml 逐段读</h2>
+<p>这个文件是整个构建系统的<b>唯一入口</b>。它大致分四块。</p>
+
+<h3>1. build-system：构建依赖的闭包</h3>
+<pre><code>[build-system]
+requires = [
+  "numpy",
+  "packaging&gt;=24.2",
+  "pyyaml",
+  "scikit-build-core&gt;=1.1.1",
+  "typing-extensions&gt;=4.15.0",
+  "six",
+]
+build-backend = "scikit_build_core.build"</code></pre>
+<p>注释里有一条依赖链很值得注意：</p>
+<blockquote class="mini">
+  NNPACK → PeachPy → six。PeachPy 在构建期生成 NNPACK 的热点汇编，且 <code>import six</code>。
+  NNPACK 默认开启（<code>USE_NNPACK=ON</code>），所以隔离构建也必须能拿到 six。
+</blockquote>
+<p>这说明构建依赖不是「随便列几个」，而是<b>构建期代码路径的真实闭包</b>。少一个，某条默认路径就会断。</p>
+
+<h3>2. tool.scikit-build：给适配层的指令</h3>
+<table>
+  <tr><th>配置</th><th>作用</th><th>知识</th></tr>
+  <tr><td><code>minimum-version = "build-system.requires"</code></td><td>版本下限跟 build requires 对齐</td><td>避免两处版本漂移</td></tr>
+  <tr><td><code>build-dir = "build"</code></td><td>构建目录</td><td>持久化，增量构建的前提</td></tr>
+  <tr><td><code>install-dir = "torch"</code></td><td>CMake 的 install prefix 落在 wheel 内的 <code>torch/</code></td><td>决定 <code>torch/lib</code>、<code>torch/include</code> 布局</td></tr>
+  <tr><td><code>strip = false</code></td><td>保留符号</td><td><code>torch.utils.cpp_extension</code> 与 ABI 检查需要</td></tr>
+  <tr><td><code>packages = ["torch","torchgen","functorch"]</code></td><td>打包哪些 Python 包</td><td>不是「整个仓库」</td></tr>
+</table>
+
+<h3>3. env 与 overrides：配置翻译层</h3>
+<pre><code>[tool.scikit-build.env]
+CMAKE_BUILD_PARALLEL_LEVEL = { env = "MAX_JOBS" }
+CC  = { env = "CC" }
+CXX = { env = "CXX" }
+
+[[tool.scikit-build.overrides]]
+if.env.DEBUG = true
+cmake.build-type = "Debug"
+
+[[tool.scikit-build.overrides]]
+if.env.REL_WITH_DEB_INFO = true
+cmake.build-type = "RelWithDebInfo"</code></pre>
+<p>注意几个细节：</p>
+<ul>
+  <li><code>MAX_JOBS</code> 是 PyTorch 的<b>总并行度旋钮</b>，被别名到 CMake 原生识别的 <code>CMAKE_BUILD_PARALLEL_LEVEL</code>。语义是 setdefault：用户显式设了后者就以后者为准。</li>
+  <li>把 <code>CC</code>/<code>CXX</code> 列进 env 表，是为了<b>关闭</b> scikit-build-core 的 sysconfig 编译器注入，避免 conda <code>compiler_compat</code> 或陈旧 venv 里的 gcc 干扰编译器探测。</li>
+  <li><code>cmake.build-type</code> 故意不设默认值，让 CI 能通过环境变量传 <code>RelWithAssert</code>。</li>
+</ul>
+<div class="callout info">
+  <b class="t">这是「配置的配置」</b>
+  PyTorch 没有把 <code>DEBUG</code> 直接塞进 CMake，而是先用声明式规则翻译成 <code>CMAKE_BUILD_TYPE</code>。
+  好处是：用户只学一套环境变量，底层工具怎么变都不影响用户。
+</div>
+
+<h3>4. 一个 platform-specific override 的案例</h3>
+<pre><code>if.platform-system = "win32"
+cmake.define.CMAKE_GENERATOR = "Ninja"
+env.CC = "cl"
+env.CXX = "cl"</code></pre>
+<p>注释解释了原因：Windows 上默认用 Visual Studio 生成器，但它按 toolset 选编译器，会忽略 oneDNN-XPU 指定的 <code>icx</code>，
+导致 oneDNN 用 MSVC 配置并失败。改成 Ninja 后，又要把宿主编译器钉死为 <code>cl</code>，否则 Intel oneAPI 环境里的 <code>icx</code>
+会被误选去编译 CPU 代码，在 sleef 的 <code>__float128</code> 探测上翻车。</p>
+<p class="mini">这类注释是构建系统里最值钱的东西：它记录的不是「怎么做」，而是「为什么不能那么做」。<b>写构建代码时，一定要留下反例。</b></p>
+
+<h2 id="scikit">scikit-build-core 的角色</h2>
+<p>它是 CMake 与 Python 打包世界之间的<b>协议转换器</b>。职责可以概括成四件事：</p>
+<table>
+  <tr><th>职责</th><th>具体行为</th></tr>
+  <tr><td>注入上下文</td><td>设置 <code>SKBUILD_PROJECT_NAME</code>、<code>SKBUILD_PROJECT_VERSION</code>、<code>SKBUILD_PLATLIB_DIR</code> 等，供 CMake 读取</td></tr>
+  <tr><td>翻译配置</td><td>把 <code>[tool.scikit-build]</code> 的字段变成 CMake cache 变量（<code>cmake.define.*</code>）</td></tr>
+  <tr><td>驱动构建</td><td>依次执行 configure → build → install</td></tr>
+  <tr><td>组装产物</td><td>把 install prefix 下的文件打进 wheel；editable 模式下生成重定向 hook</td></tr>
+</table>
+
+<h3>SKBUILD 变量如何影响 CMake</h3>
+<p>顶层 <span class="path">CMakeLists.txt</span> 里有这样一段逻辑：</p>
+<pre><code>if(SKBUILD)
+  get_filename_component(_torch_pkg_dir "${SKBUILD_PLATLIB_DIR}/torch" ABSOLUTE)
+  get_filename_component(_torch_prefix "${CMAKE_INSTALL_PREFIX}" ABSOLUTE)
+  if(NOT _torch_pkg_dir STREQUAL _torch_prefix)
+    message(FATAL_ERROR ...)
+  endif()
+endif()</code></pre>
+<p>为什么必须相等？因为：</p>
+<ul>
+  <li>扩展模块通过 <code>$ORIGIN/lib</code>（macOS 是 <code>@loader_path</code>）的 rpath 找 C++ 库；</li>
+  <li><code>torch/__init__.py</code> 通过自己的 <code>__file__</code> 找 <code>bin/</code> 和 <code>lib/</code>；</li>
+  <li>所以 install prefix 必须正好是 <code>torch</code> 包目录。</li>
+</ul>
+<p><b>与其让错误在 import 时才暴露，不如在 configure 阶段直接 FATAL_ERROR。</b>这是构建系统设计的黄金法则：<b>把失败提前到最便宜的阶段</b>。</p>
+
+<div class="callout warn">
+  <b class="t">注意：CMake 也能独立运行</b>
+  <span class="path">CMakeLists.txt</span> 的注释说明：正常由 scikit-build-core 驱动，例外是
+  <span class="path">tools/build_libtorch.py</span> 的独立 libtorch 构建。
+  为此顶层对 <code>SKBUILD_PROJECT_NAME/VERSION</code> 提供了 fallback（从 <code>version.txt</code> 读）。
+  <b>同一个 CMake 工程要能服务两种驱动方式</b>，这是它保持可移植的关键。
+</div>
+
+<h2 id="cmake">CMake 的角色</h2>
+
+<h3>1. 选项矩阵：所有开关集中声明</h3>
+<p>顶层 <span class="path">CMakeLists.txt</span> 用 <code>option()</code> / <code>cmake_dependent_option()</code> 声明全部构建设置。节选：</p>
+<pre><code>option(BUILD_PYTHON "Build Python binaries" ON)
+option(BUILD_TEST "Build C++ test binaries" ON)
+option(BUILD_SHARED_LIBS "Build libcaffe2.so" ON)
+cmake_dependent_option(USE_CUDA "Use CUDA" ON "NOT USE_TSAN" OFF)
+option(USE_XPU "Use XPU" ON)
+cmake_dependent_option(USE_ROCM "Use ROCm" ON "LINUX OR WIN32" OFF)
+cmake_dependent_option(USE_CUDNN "Use cuDNN" ON "USE_CUDA" OFF)
+option(USE_FBGEMM "Use FBGEMM" ON)
+option(USE_KINETO "Use Kineto profiling library" ON)</code></pre>
+<p>三条规则值得学：</p>
+<ol>
+  <li><b>每个选项都要有默认值与说明</b>，不能有「隐藏开关」。</li>
+  <li><b>依赖关系用 <code>cmake_dependent_option</code> 表达</b>（例如 USE_CUDNN 只在 USE_CUDA 时有意义），而不是在脚本里写一堆 if。</li>
+  <li><b>新增选项必须同步 <span class="path">cmake/Summary.cmake</span></b>。这条规则写在顶层注释里，是强制约定。否则用户无法确认自己的配置是否生效。</li>
+</ol>
+
+<h3>2. 环境变量转发：一个刻意收窄的接口</h3>
+<p><span class="path">cmake/EnvVarForwarding.cmake</span> 的规则写得很清楚：</p>
+<blockquote>
+  一个环境变量会被转发为同名 CMake cache 变量，当且仅当它
+  (a) 以 <code>BUILD_</code>、<code>USE_</code>、<code>CMAKE_</code> 开头，
+  (b) 以 <code>EXITCODE</code> / <code>EXITCODE__TRYRUN_OUTPUT</code> 结尾，
+  (c) 出现在 <code>_ENV_ALIASES</code> / <code>_ENV_PASSTHROUGH</code> / <code>_LOW_PRIORITY_ALIASES</code> 列表里。
+</blockquote>
+<p>这意味着：<b>不是所有环境变量都能影响构建</b>。想加新的配置面，必须显式登记，并在该文件里写文档。</p>
+<div class="callout tip">
+  <b class="t">为什么不自动全转发？</b>
+  环境变量是全局命名空间。自动转发会把 <code>PATH</code>、<code>HOME</code>、CI 系统的变量全灌进 CMake cache，
+  造成「本机能构建、CI 不能」的隐式耦合。<b>显式白名单 = 可审计的配置面。</b>
+</div>
+
+<h3>3. 依赖发现：找现成的，还是自己建</h3>
+<p><span class="path">cmake/Dependencies.cmake</span> 处理两类依赖：</p>
+<ul>
+  <li><b>系统库</b>：<code>find_package</code> 探测（BLAS、OpenMP、cuDNN、NCCL……），可用 <code>USE_SYSTEM_*</code> 控制。</li>
+  <li><b>随仓库构建的库</b>：third_party 子模块，用 <code>add_subdirectory</code> 或 <code>ExternalProject</code> 构建。</li>
+</ul>
+<p>这里也是加速后端工具链的接线处：<code>USE_CUDA</code> 分支会 include <span class="path">cmake/public/cuda.cmake</span>，
+设置 CUDA 的 arch、编译选项、依赖库列表。</p>
+<p class="mini">一个细节：NCCL 不是 git 子模块，而是默认（<code>USE_SYSTEM_NCCL=OFF</code>）在构建期按 pinned 版本
+通过 <code>FetchContent</code> 拉取到 <code>third_party/nccl</code>（见 <span class="path">cmake/PreBuildSteps.cmake</span>）；
+<code>USE_SYSTEM_NCCL=1</code> 时才改为链接系统安装的 NCCL。</p>
+
+<h3>4. target 拓扑：依赖是有向无环的</h3>
+<pre><code>c10                    基础类型、Allocator、DispatchKey、TensorImpl
+ └── torch_cpu        ATen CPU kernel、caffe2、autograd 引擎
+      ├── torch_cuda   CUDA kernel（可选）
+      ├── torch_hip    ROCm kernel（可选）
+      └── torch_xpu    XPU kernel（可选）
+           └── torch  伞形库（umbrella），统一链接
+                └── torch_python   Python 扩展 _C.so（pybind11）</code></pre>
+<table>
+  <tr><th>target</th><th>定义位置</th><th>职责</th></tr>
+  <tr><td><code>c10</code></td><td><span class="path">c10/CMakeLists.txt:48</span></td><td>无上层依赖的基础库</td></tr>
+  <tr><td><code>torch_cpu</code></td><td><span class="path">caffe2/CMakeLists.txt:886</span></td><td>CPU 算子与引擎</td></tr>
+  <tr><td><code>torch_cuda</code></td><td><span class="path">caffe2/CMakeLists.txt:1064</span></td><td>CUDA kernel，按需构建</td></tr>
+  <tr><td><code>torch</code></td><td><span class="path">caffe2/CMakeLists.txt:1013</span></td><td>伞形 target，用 dummy 源文件承载链接关系</td></tr>
+  <tr><td><code>torch_python</code></td><td><span class="path">torch/CMakeLists.txt:307</span></td><td>唯一的 Python 边界（<code>_C.so</code>）</td></tr>
+</table>
+<div class="callout info">
+  <b class="t">为什么要有伞形库</b>
+  下游 C++ 用户只想 <code>find_package(Torch)</code> 然后链接一个 <code>torch</code>，不想关心后端组合。
+  伞形 target 把「后端矩阵」封装成一个稳定名字。<b>这是「对外的窄接口，对内的宽实现」。</b>
+</div>
+
+<h3>5. 安装布局：rpath 是运行时契约</h3>
+<pre><code># cmake/Dependencies.cmake
+if(APPLE)
+  set(CMAKE_INSTALL_RPATH "@loader_path")
+else()
+  set(CMAKE_INSTALL_RPATH $ORIGIN)
+endif()</code></pre>
+<p>配合 <code>install-dir = "torch"</code>，最终布局是：</p>
+<pre><code>torch/
+├── __init__.py
+├── _C.cpython-313-...so       # 扩展模块
+├── lib/
+│   ├── libtorch.so
+│   ├── libtorch_cpu.so
+│   ├── libtorch_cuda.so
+│   └── libc10.so
+└── include/
+    └── torch/ ...</code></pre>
+<p><code>$ORIGIN/lib</code> 让 <code>_C.so</code> 无需设置 <code>LD_LIBRARY_PATH</code> 就能找到同目录下的 <code>lib/</code>。
+这个决定让 wheel 可以「解压即用」，也让 editable 重定向目录同样可用。</p>
+
+<h3>6. 编译期契约：ABI、符号与 stable API</h3>
+<ul>
+  <li><b>C++ ABI</b>：<code>_GLIBCXX_USE_CXX11_ABI</code> 必须与用户扩展一致，否则链接期出现难解的符号错误。</li>
+  <li><b>符号保留</b>：<code>strip = false</code>，因为 <code>torch.utils.cpp_extension</code> 与 CI 的 ABI 检查需要符号表。</li>
+  <li><b>Stable API 头包装</b>：安装期运行 <span class="path">tools/wrap_headers.py</span>，给头文件加上
+    <code>TORCH_STABLE_ONLY</code> / <code>TORCH_TARGET_VERSION</code> 守卫，
+    在用户定义这些宏时直接编译报错，而不是产生难查的运行时问题。</li>
+  <li><b>compile_commands.json</b>：<span class="path">cmake/PostBuildSteps.cmake</span> 会合并各子目录的编译数据库，供 clangd/工具链使用。</li>
+</ul>
+
+<h2 id="ninja">Ninja 与增量构建</h2>
+<h3>Ninja 只做一件事：按依赖图尽快执行</h3>
+<p>CMake 负责「生成」<code>build.ninja</code>，Ninja 负责「执行」。它不理解语义，只看三样东西：</p>
+<ul>
+  <li><code>build.ninja</code>：目标、规则、依赖边；</li>
+  <li><code>.ninja_log</code>：每个目标的执行记录；</li>
+  <li><code>.ninja_deps</code>：头文件依赖（gcc/clang 的 <code>-MD</code> 输出）。</li>
+</ul>
+<p>所以「改一个头文件导致大面积重编」不是 Ninja 的错，是<b>依赖图如实反映了代码耦合</b>。</p>
+
+<h3>并行度：一个旋钮，三处生效</h3>
+<pre><code>MAX_JOBS=14 pip install -e . -v --no-build-isolation</code></pre>
+<table>
+  <tr><th>位置</th><th>如何生效</th></tr>
+  <tr><td>CMake / Ninja</td><td><code>[tool.scikit-build.env]</code> 把 <code>MAX_JOBS</code> 映射为 <code>CMAKE_BUILD_PARALLEL_LEVEL</code></td></tr>
+  <tr><td>cpp_extension JIT</td><td>同样读 <code>MAX_JOBS</code></td></tr>
+  <tr><td>第三方子构建</td><td>NCCL / MKLDNN 等子构建也读它</td></tr>
+</table>
+<p>另外 <code>FLASH_ATTENTION_MAX_JOBS</code> 单独控制 FlashAttention 的 CUDA 编译并发（CI 按 runner 内存设置）。</p>
+
+<h3>编译缓存：ccache / sccache</h3>
+<pre><code>cmake_dependent_option(USE_CCACHE "Attempt using [S]CCache to wrap the compilation" ON "UNIX" OFF)</code></pre>
+<p>CMake 会自动找 <code>ccache</code>，找不到再找 <code>sccache</code>，并通过 <code>CMAKE_*_COMPILER_LAUNCHER</code> 包装编译器。
+CI 里 ROCm 构建会显式设置 launcher。</p>
+<div class="callout tip">
+  <b class="t">增量构建什么时候失效</b>
+  以下情况需要更彻底的重建：<br>
+  · 改了 <code>CMakeLists.txt</code> 或 <code>cmake/*.cmake</code> → CMake 重新 configure；<br>
+  · 改了 <code>native_functions.yaml</code> / <code>derivatives.yaml</code> → codegen 重跑，可能大量文件变化；<br>
+  · 切换编译器 / Python 版本 / CUDA 版本 → 缓存与 ABI 都不再匹配；<br>
+  · 改了 <code>pyproject.toml</code> 的构建相关字段 → 后端行为变化。
+</div>
+
+<h2 id="codegen">代码生成：torchgen</h2>
+<p>这是 PyTorch 构建系统里最具设计感的部分。它解决的问题是：<b>几千个算子 × 8 个后端 × 3 种语言表面（C++ / Python / 类型存根）× 反向公式</b>，靠手写不可能保持一致。</p>
+
+<h3>单一事实来源：native_functions.yaml</h3>
+<p>真实条目（<span class="path">aten/src/ATen/native/native_functions.yaml</span>）：</p>
+<pre><code>- func: add.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -&gt; Tensor
+  device_check: NoCheck
+  structured_delegate: add.out
+  variants: function, method
+  dispatch:
+    SparseCPU, SparseCUDA, SparseMPS, SparseMeta, SparseXPU: add_sparse
+    SparseCsrCPU, SparseCsrCUDA, SparseCsrMeta, SparseCsrXPU: add_sparse_csr
+    MkldnnCPU: mkldnn_add
+    ZeroTensor: add_zerotensor
+    Meta: add_Tensor_meta
+    NestedTensorCPU, NestedTensorHPU, NestedTensorCUDA, NestedTensorXPU: NestedTensor_add_Tensor
+  tags: [core, pointwise]</code></pre>
+<p>这一条声明同时生成了：</p>
+<ul>
+  <li><b>C++ 函数签名</b>与 <code>at::_ops::add_Tensor::call</code> 的分发入口；</li>
+  <li><b>dispatch 注册表</b>（哪个 key 走哪个 kernel）；</li>
+  <li><b>Python 绑定</b>（<code>torch.add</code>、<code>Tensor.add</code>）；</li>
+  <li><b>类型存根</b>的输入（<code>.pyi</code> 由 <span class="path">tools/pyi/gen_pyi.py</span> 从 <code>.pyi.in</code> 生成）；</li>
+  <li><b>autograd 接口</b>（反向公式在 <span class="path">tools/autograd/derivatives.yaml</span>）。</li>
+</ul>
+
+<h3>生成流水线</h3>
+<div class="pipe">
+  <div class="pnode step-a"><span class="n">native_functions.yaml + tags.yaml</span><span class="f">aten/src/ATen/native/</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-b"><span class="n">torchgen/gen.py</span><span class="f">cmake/Codegen.cmake 调用 python -m torchgen.gen</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-c"><span class="n">生成物</span><span class="f">build/aten/src/ATen/{ops,core,...}/*.h, *.cpp</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-c"><span class="n">autograd 生成</span><span class="f">tools/setup_helpers/generate_code.py → torch/csrc/autograd/generated/</span></div>
+  <div class="parrow">↓</div>
+  <div class="pnode step-d"><span class="n">类型存根</span><span class="f">torch/CMakeLists.txt → python -m tools.pyi.gen_pyi → *.pyi</span></div>
+</div>
+
+<h3>为什么用代码生成，而不是宏或模板</h3>
+<table>
+  <tr><th>方案</th><th>问题</th></tr>
+  <tr><td>C++ 宏</td><td>错误信息不可读、调试困难、无法跨语言（Python 绑定生成不了）</td></tr>
+  <tr><td>手写模板</td><td>几千个算子的重复代码无法维护</td></tr>
+  <tr><td><b>外部生成器（Python）</b></td><td>生成物是普通 C++，可读、可搜索、可断点；生成逻辑本身可用 Python 快速迭代；能同时产出 C++/Python/stub</td></tr>
+</table>
+<div class="callout warn">
+  <b class="t">代价：生成物不能手改</b>
+  所有 <code>build/</code> 下的生成文件都是产物。改 <code>.pyi</code> 无效（要从 <code>.pyi.in</code> 生成），
+  改 <code>generated/*.cpp</code> 无效（下次构建被覆盖）。<b>单一事实来源的代价是「必须改源头」。</b>
+</div>
+
+<h3>跨构建系统共享源清单</h3>
+<p><span class="path">cmake/Codegen.cmake</span> 里有一段非常有意思的代码：它<b>把 <code>build_variables.bzl</code> 当 Python 执行</b>，来提取源文件列表：</p>
+<pre><code>execute_process(COMMAND ${Python_EXECUTABLE} -c
+  "exec(open('${PROJECT_SOURCE_DIR}/build_variables.bzl').read());
+   print(';'.join([...]))")</code></pre>
+<p>原因：<code>build_variables.bzl</code> 同时被 <b>Buck</b>（Meta 内部构建）和 <b>CMake</b>（OSS 构建）使用。
+如果在两处各维护一份源文件列表，必然漂移。<b>用 Starlark 的语法子集当配置文件，两种构建系统都能读。</b></p>
+<p class="mini">这是「跨工具链的单一事实来源」的典型手法：选一个双方都能解析的最简格式，而不是让一方去适配另一方的 DSL。</p>
+
+<h2 id="matrix">多后端与多平台矩阵</h2>
+<h3>后端维度</h3>
+<table>
+  <tr><th>后端</th><th>开关</th><th>工具链</th><th>产物 target</th></tr>
+  <tr><td>CPU</td><td>默认</td><td>clang/gcc + BLAS/oneDNN</td><td><code>torch_cpu</code></td></tr>
+  <tr><td>CUDA</td><td><code>USE_CUDA</code></td><td>nvcc + cuDNN/cuBLAS/NCCL</td><td><code>torch_cuda</code></td></tr>
+  <tr><td>ROCm</td><td><code>USE_ROCM</code></td><td>hipcc + rocBLAS/MIOpen</td><td><code>torch_hip</code></td></tr>
+  <tr><td>XPU</td><td><code>USE_XPU</code></td><td>Intel oneAPI</td><td><code>torch_xpu</code></td></tr>
+  <tr><td>MPS</td><td>macOS 默认</td><td>Metal</td><td>编译进 <code>torch_cpu</code></td></tr>
+</table>
+
+<h3>为什么矩阵没有炸掉</h3>
+<ol>
+  <li><b>用选项组合，而不是复制代码树</b>。同一份源码，靠 <code>USE_*</code> + dispatch key 决定编译哪些分支。</li>
+  <li><b>用 target 隔离</b>。每个后端一个 target，链接关系清晰；伞形 <code>torch</code> 负责组合。</li>
+  <li><b>用 codegen 隔离</b>。后端差异体现在 YAML 的 <code>dispatch:</code> 表里，而不是散落在手写代码中。</li>
+  <li><b>用 arch 列表控制产物大小</b>。<code>TORCH_CUDA_ARCH_LIST</code> 决定为哪些 SM 架构生成代码；全架构会让二进制膨胀数倍。</li>
+</ol>
+
+<h3>子模块策略</h3>
+<p><span class="path">cmake/PreBuildSteps.cmake</span> 做三件事：</p>
+<ol>
+  <li>从 <code>.gitmodules</code> 读子模块路径；</li>
+  <li>如果全部缺失且存在 <code>.git</code>，自动执行 <code>git submodule update --init --recursive</code>；</li>
+  <li>校验每个子模块是否包含预期文件（<code>CMakeLists.txt</code>、<code>LICENSE</code> 等），防止「目录存在但为空」的坏检出。</li>
+</ol>
+<div class="callout info">
+  <b class="t">为什么要在构建里做，而不是文档里写</b>
+  文档会被跳过，构建不会。把「前置条件检查」放进构建流程，错误信息就能带着修复命令一起出现。
+  注意它<b>只在 git checkout 下才尝试 init</b>：源码 tarball 没有 <code>.git</code>，不能跑 <code>git submodule</code>。
+</div>
+
+<h2 id="devrel">开发态 vs 发布态</h2>
+<table>
+  <tr><th>维度</th><th>开发态（editable）</th><th>发布态（wheel）</th></tr>
+  <tr><td>命令</td><td><code>pip install -e . --no-build-isolation</code><br>或 <code>spin develop</code></td><td><code>pip install .</code><br>或 <code>python -m build --wheel --no-isolation</code></td></tr>
+  <tr><td>Python 文件</td><td>源码树</td><td>复制进 wheel</td></tr>
+  <tr><td>C++ 产物</td><td><code>build/install/{wheel_tag}</code></td><td><code>torch/lib</code></td></tr>
+  <tr><td>改 .py</td><td>立即生效</td><td>不适用</td></tr>
+  <tr><td>改 .cpp</td><td>重跑构建命令（增量）</td><td>重新打包</td></tr>
+  <tr><td>目标</td><td>反馈延迟最小</td><td>可分发、可复现</td></tr>
+</table>
+
+<h3>libtorch：不带 Python 的同一套构建</h3>
+<pre><code>BUILD_PYTHON=0 python tools/build_libtorch.py</code></pre>
+<p><code>BUILD_PYTHON</code> 是 CMake 选项（默认 ON）。关掉后：</p>
+<ul>
+  <li>不构建 <code>torch_python</code>；</li>
+  <li>不安装 Python 包数据；</li>
+  <li>产出纯粹的 C++ 库 + 头文件 + <code>Caffe2Config.cmake</code>，供下游 <code>find_package(Torch)</code> 使用。</li>
+</ul>
+<p>另外还有 <code>BUILD_LIBTORCH_WHL</code>（把 libtorch 打成 wheel）与 <code>BUILD_PYTHON_ONLY</code>（Python wheel 链接独立 libtorch）。
+<b>同一份 CMake 工程，通过选项组合服务多种交付形态。</b></p>
+
+<h3>setup.py 的退场</h3>
+<p><span class="path">setup.py</span> 现在只是一个转发器：</p>
+<pre><code>FORWARDS = {
+    "install": [*PIP_INSTALL, "."],
+    "develop": [*PIP_INSTALL, "-e", "."],
+}</code></pre>
+<p>头部注释写明了时间表：2.14–2.15 转发，2.16–2.17 全部报错并给指引，2.18 移除。
+这是<b>渐进式迁移</b>的范本：先兼容、再警告、再移除，每一步都留出迁移窗口。</p>
+
+<h2 id="ci">CI 与可复现性</h2>
+<ul>
+  <li><b>环境即镜像</b>：<span class="path">.ci/docker/</span> 下有 ubuntu、almalinux、manywheel、linter 等镜像定义，<code>requirements-ci.txt</code> 精确锁版本。</li>
+  <li><b>镜像内容哈希</b>：<code>.ci/docker/</code> 的任何改动都会改变哈希，触发镜像重建。这是仓库的硬规则（见 CLAUDE.md），因为改一个 README 也可能让所有 CI 重新拉镜像。</li>
+  <li><b>构建脚本统一</b>：<span class="path">.ci/pytorch/build.sh</span> 是入口，按 <code>BUILD_ENVIRONMENT</code> 分支（cuda / rocm / cpu / cuda13 …）。</li>
+  <li><b>缓存</b>：ROCm 用 sccache；CUDA 构建用 jemalloc 预加载规避已知问题；CUDA 13 关闭 FBGEMM。</li>
+  <li><b>版本锚点</b>：<code>triton_version.txt</code>、<code>version.txt</code>、submodule pin 共同定义「这次构建到底用了什么」。</li>
+</ul>
+<div class="callout tip">
+  <b class="t">可复现性的三要素</b>
+  ① 输入可枚举（源码 + 子模块 + 依赖版本）；
+  ② 工具链可标识（编译器、CMake、Ninja、CUDA）；
+  ③ 配置可打印（<code>Summary.cmake</code>）。
+  PyTorch 三条都做了，所以 CI 失败可以「复现」，而不是「再跑一次试试」。
+</div>
+
+<h2 id="debug">分层排错手册</h2>
+<table>
+  <tr><th>阶段</th><th>典型报错</th><th>根因方向</th><th>怎么查</th></tr>
+  <tr><td>pip / 后端导入</td><td><code>ModuleNotFoundError: scikit_build_core</code></td><td>缺构建依赖</td><td>检查 venv 里是否装了 pyproject 的 requires</td></tr>
+  <tr><td>PEP 517</td><td><code>BackendUnavailable</code></td><td>后端未安装 / 版本太低</td><td><code>pip show scikit-build-core</code></td></tr>
+  <tr><td>CMake bootstrap</td><td><code>Could not find compiler</code></td><td>CC/CXX 不对</td><td><code>which cc c++</code>，检查 conda 污染</td></tr>
+  <tr><td>CMake 依赖</td><td><code>Could NOT find CUDA</code></td><td>路径/版本不匹配</td><td><code>nvcc --version</code>，<code>CUDA_HOME</code></td></tr>
+  <tr><td>子模块</td><td><code>third_party/... is empty</code></td><td>未初始化</td><td><code>git submodule status</code></td></tr>
+  <tr><td>codegen</td><td><code>yaml.scanner.ScannerError</code></td><td>YAML 手改坏了</td><td>从 <code>native_functions.yaml</code> 附近开始看</td></tr>
+  <tr><td>编译</td><td><code>error: ... file:line</code></td><td>C++/CUDA 代码</td><td>先在单文件上跑编译器</td></tr>
+  <tr><td>链接</td><td><code>undefined reference to ...</code></td><td>target 依赖 / ABI</td><td>检查 <code>_GLIBCXX_USE_CXX11_ABI</code></td></tr>
+  <tr><td>安装</td><td>prefix 断言失败</td><td><code>install-dir</code> 与 platlib 不一致</td><td>看 <code>[tool.scikit-build.wheel]</code></td></tr>
+  <tr><td>import</td><td><code>ImportError: libtorch_cpu.so</code></td><td>rpath / 产物缺失</td><td><code>ldd torch/_C*.so</code></td></tr>
+</table>
+
+<h3>三个高价值命令</h3>
+<pre><code># 1. 看最终配置（阶段 9）
+#    -v 日志里搜索 "******** Summary ********"
+#    重点看 USE_CUDA / USE_CUDNN / BUILD_PYTHON / CXX flags / Build type
+
+# 2. 看某次构建到底编译了什么
+ninja -C build -t commands | grep &lt;file&gt;
+
+# 3. 看构建图（谁依赖谁）
+ninja -C build -t graph | dot -Tsvg &gt; graph.svg</code></pre>
+
+<h2 id="lessons">10 条可迁移的架构经验</h2>
+<p>这部分是本文的真正目的：把 PyTorch 的具体做法抽象成可复用的设计原则。</p>
+
+<div class="laws">
+  <div class="law">
+    <div class="num">01</div>
+    <h4>单一事实来源 + 生成器</h4>
+    <p><b>做法：</b>算子 schema、反向公式、源文件清单都只有一份，其余全部生成。</p>
+    <p><b>收益：</b>一致性由机器保证，新增接口的成本从「改 8 处」变成「改 1 处 + 跑生成」。</p>
+    <p><b>代价：</b>生成物不可手改，调试链路变长。<b>适用：</b>接口数量 &gt; 50 且高度同构。</p>
+  </div>
+  <div class="law">
+    <div class="num">02</div>
+    <h4>分层，且每层只依赖下一层的稳定接口</h4>
+    <p><b>做法：</b>pip 只认 PEP 517；scikit-build 只认 CMake；Ninja 只认文件依赖。</p>
+    <p><b>收益：</b>任何一层可替换（setuptools→scikit-build、Make→Ninja），爆炸半径可控。</p>
+  </div>
+  <div class="law">
+    <div class="num">03</div>
+    <h4>配置面必须显式、集中、可打印</h4>
+    <p><b>做法：</b>环境变量白名单 + <code>option()</code> 集中声明 + <code>Summary</code> 打印最终值。</p>
+    <p><b>收益：</b>「为什么 CI 和本地不一样」变成可回答的问题。</p>
+  </div>
+  <div class="law">
+    <div class="num">04</div>
+    <h4>开发态与发布态分离</h4>
+    <p><b>做法：</b>editable redirect vs wheel；两种产物、两条路径、同一个源。</p>
+    <p><b>收益：</b>开发反馈快，发布产物干净。</p>
+  </div>
+  <div class="law">
+    <div class="num">05</div>
+    <h4>把失败提前到最便宜的阶段</h4>
+    <p><b>做法：</b>configure 阶段断言 install prefix；构建前校验子模块；stable-ABI 头文件在编译期就报错。</p>
+    <p><b>收益：</b>错误定位成本从「运行时 3 小时」降到「构建时 3 秒」。</p>
+  </div>
+  <div class="law">
+    <div class="num">06</div>
+    <h4>增量与缓存是一等公民</h4>
+    <p><b>做法：</b>持久 build dir、Ninja、ccache/sccache、可选的 auto-rebuild。</p>
+    <p><b>收益：</b>构建时间从 O(全量) 降到 O(改动)。</p>
+    <p><b>注意：</b>缓存必须有明确的失效条件，否则会制造「幽灵 bug」。</p>
+  </div>
+  <div class="law">
+    <div class="num">07</div>
+    <h4>矩阵用组合表达，不用分支复制</h4>
+    <p><b>做法：</b><code>USE_*</code> 选项 × target × dispatch key，而不是为每个后端复制一棵源码树。</p>
+    <p><b>收益：</b>N 个后端只需 O(N) 个开关，而不是 O(N) 份代码。</p>
+  </div>
+  <div class="law">
+    <div class="num">08</div>
+    <h4>每层有自己的错误语义</h4>
+    <p><b>做法：</b>缺依赖、configure 失败、codegen 失败、编译失败、链接失败、安装失败，报错形态各不相同且可区分。</p>
+    <p><b>收益：</b>排错从「读最后一行」变成「判断阶段」。<b>设计错误信息时，先设计分类。</b></p>
+  </div>
+  <div class="law">
+    <div class="num">09</div>
+    <h4>跨工具链共享清单</h4>
+    <p><b>做法：</b><code>build_variables.bzl</code> 同时被 Buck 和 CMake 读取。</p>
+    <p><b>收益：</b>避免「内部构建能过、开源构建不能过」的漂移。</p>
+    <p><b>手法：</b>选双方都能解析的最简格式，而不是让一方适配另一方。</p>
+  </div>
+  <div class="law">
+    <div class="num">10</div>
+    <h4>语言边界按「性能」与「迭代速度」划分</h4>
+    <p><b>做法：</b>性能关键路径用 C++/CUDA；编译器、生成器、胶水用 Python；边界收窄到一个 <code>_C.so</code>。</p>
+    <p><b>收益：</b>既拿到性能，又保留快速迭代；边界少，ABI 与调试复杂度可控。</p>
+  </div>
+</div>
+
+<div class="callout info">
+  <b class="t">如果只能记一条</b>
+  复杂系统不是靠「一个更强的工具」解决的，而是靠<b>把复杂度切成互相独立、各自可验证的层</b>。
+  PyTorch 的构建系统之所以能同时服务开发者、CI、wheel 用户、libtorch 用户和移动端，
+  是因为每一层都只回答一个问题，并且用标准接口把答案传给下一层。
+</div>
+
+<h2 id="labs">动手实验</h2>
+<p>按顺序做，每个都能在 10–30 分钟内完成（构建本身除外）。</p>
+<ol>
+  <li><b>定位 9 个阶段。</b>跑一次构建，在 <code>-v</code> 日志里标出每个阶段的开始行。写下你是靠什么特征识别的。</li>
+  <li><b>读 Summary。</b>找到 <code>******** Summary ********</code>，抄下 10 个关键值，解释每一个的来源（选项 / 环境变量 / 自动探测）。</li>
+  <li><b>加一个算子。</b>在 <code>native_functions.yaml</code> 里加一个最简单的 op，重建，找到它在 <code>build/aten/src/ATen/</code> 下生成了哪些文件。然后执行 <code>git checkout -- aten/src/ATen/native/native_functions.yaml</code>。</li>
+  <li><b>验证 editable 语义。</b>改一个 <code>torch/*.py</code> 里的字符串，<code>import</code> 验证生效；再改一个 <code>.cpp</code>，验证<b>不</b>生效，然后重建验证生效。</li>
+  <li><b>并行度实验。</b>分别用 <code>MAX_JOBS=1</code>、<code>MAX_JOBS=14</code> 构建一个小目标，记录 wall time 与 CPU 利用率。</li>
+  <li><b>缓存实验。</b>装 ccache，做一次全量构建，再 <code>touch</code> 一个源文件重建，看命中率。</li>
+  <li><b>读构建图。</b><code>ninja -C build -t graph | dot -Tsvg</code>，找出 <code>torch_python</code> 到 <code>c10</code> 的路径。</li>
+  <li><b>制造一次 configure 失败。</b>把 <code>install-dir</code> 改错，观察断言在哪一步触发、错误信息是否足够定位。</li>
+  <li><b>看 wheel。</b><code>python -m build --wheel --no-isolation</code>，解压 <code>.whl</code>，对照本文的安装布局，找出所有非 Python 文件。</li>
+  <li><b>构建 libtorch。</b><code>BUILD_PYTHON=0</code>，对比构建时间与产物大小，理解「关掉 Python 绑定」省掉了什么。</li>
+</ol>
+
+<h2 id="quiz">自测题</h2>
+
+<details><summary>1. pip 和 CMake 各自负责什么？为什么不能合并？</summary>
+  <p class="a"><b>pip</b> 是包管理器与 PEP 517 驱动：解析元数据、管理隔离、调用后端、安装 wheel。<b>CMake</b> 是构建系统：发现依赖、生成构建图、组织 target。<br>
+  <b>不能合并</b>：pip 要服务所有 Python 项目（纯 Python 项目根本不需要 CMake），CMake 要服务所有 C++ 项目（不关心 Python 打包）。合并会让两者都被迫理解对方的领域，失去可替换性。</p>
+</details>
+
+<details><summary>2. <code>--no-build-isolation</code> 的收益与代价分别是什么？</summary>
+  <p class="a"><b>收益</b>：使用环境里真实的 numpy（ABI 一致）、cmake、ninja、CUDA toolkit；避免每次重复安装依赖。<br>
+  <b>代价</b>：pip 不再自动安装 <code>[build-system].requires</code>，缺依赖时直接失败；构建不再可复现（受当前环境污染）。<br>
+  <b>结论</b>：它把「可复现」的责任从工具转移给了用户/CI 镜像。</p>
+</details>
+
+<details><summary>3. editable 的 redirect 模式解决了什么其他模式解决不了的问题？</summary>
+  <p class="a">它同时满足两个互相冲突的需求：<b>Python 文件要能热改</b>（指向源码树），<b>C++ 产物要能隔离且持久</b>（指向 <code>build/install/{wheel_tag}</code>）。<br>
+  路径注入只能处理纯 Python；符号链接会让构建产物污染源码树；复制则失去「可编辑」的意义。<br>
+  另外它默认关闭 import 时重建，避免每次 <code>import torch</code> 触发 cmake/ninja。</p>
+</details>
+
+<details><summary>4. 为什么 install prefix 必须等于 <code>&lt;platlib&gt;/torch</code>？</summary>
+  <p class="a">因为运行时定位依赖它：扩展模块通过 <code>$ORIGIN/lib</code>（macOS <code>@loader_path</code>）的 rpath 找 C++ 库；<code>torch/__init__.py</code> 通过自身 <code>__file__</code> 找 <code>bin/</code> 与 <code>lib/</code>。prefix 不一致会导致「构建成功、import 失败」。<br>
+  所以 CMake 在 configure 阶段直接 <code>FATAL_ERROR</code>，把失败提前。</p>
+</details>
+
+<details><summary>5. 为什么 PyTorch 用 YAML + 代码生成，而不是 C++ 宏？</summary>
+  <p class="a">宏无法跨语言（生成不了 Python 绑定与 <code>.pyi</code>）、错误信息差、调试困难、几千个算子的组合会失控。<br>
+  YAML 是单一事实来源，生成器可以用 Python 快速迭代，产物是普通可读 C++。<br>
+  <b>代价</b>：生成物不可手改，必须改源头。</p>
+</details>
+
+<details><summary>6. <code>build_variables.bzl</code> 为什么被 CMake 当 Python 执行？</summary>
+  <p class="a">因为它要同时服务 Buck 和 CMake 两套构建系统。它本质是 Starlark，但语法是 Python 的子集，所以 CMake 可以用 <code>exec(open(...).read())</code> 读取其中的列表。<br>
+  目的：避免两套构建系统各自维护源文件清单而产生漂移。<b>手法：选双方都能解析的最简格式。</b></p>
+</details>
+
+<details><summary>7. 环境变量转发为什么用白名单，而不是全转发？</summary>
+  <p class="a">环境变量是全局命名空间。全转发会把 <code>PATH</code>、<code>HOME</code>、CI 变量等灌进 CMake cache，造成隐式耦合与不可复现。<br>
+  白名单（<code>BUILD_*</code>、<code>USE_*</code>、<code>CMAKE_*</code> + 显式别名）让配置面可审计，新增开关必须登记并写文档。</p>
+</details>
+
+<details><summary>8. 为什么新增一个 CMake 选项必须同时改 <code>Summary.cmake</code>？</summary>
+  <p class="a">因为用户需要确认「我的配置是否真的生效」。如果选项存在但不出现在构建摘要里，用户只能靠猜。<br>
+  这是可观测性要求：<b>所有影响产物形态的配置，都必须能在构建结束时被打印。</b></p>
+</details>
+
+<details><summary>9. 改哪些文件会让增量构建失效？</summary>
+  <p class="a"><code>CMakeLists.txt</code> / <code>cmake/*.cmake</code>（重新 configure）、<code>native_functions.yaml</code> / <code>derivatives.yaml</code>（codegen 重跑）、<code>pyproject.toml</code> 的构建字段、编译器/Python/CUDA 版本变化（缓存与 ABI 不匹配）。<br>
+  改头文件也会触发依赖它的源文件重编——这是依赖图的正确行为，不是缓存失效。</p>
+</details>
+
+<details><summary>10. 如果让你设计一个「Python 前端 + Rust 核心」的系统，会借鉴哪几条？</summary>
+  <p class="a">① 用 PEP 517 后端（如 maturin）做薄适配层；② 开发态用 editable redirect，发布态出 wheel；③ schema 单一事实来源 + 生成绑定；④ 配置面白名单 + 构建摘要；⑤ 每个 target 独立，伞形库封装后端矩阵；⑥ 错误按阶段分类；⑦ 缓存有明确失效条件；⑧ 语言边界收窄到一个扩展模块。<br>
+  核心不是照搬工具，而是<b>借用分层与契约的设计</b>。</p>
+</details>
+
+<h2 id="appendix">命令速查</h2>
+<table>
+  <tr><th>目的</th><th>命令</th></tr>
+  <tr><td>开发态构建</td><td><code>pip install -e . -v --no-build-isolation</code></td></tr>
+  <tr><td>控制并行度</td><td><code>MAX_JOBS=14 pip install -e . -v --no-build-isolation</code></td></tr>
+  <tr><td>Debug 构建</td><td><code>DEBUG=1 pip install -e . -v --no-build-isolation</code></td></tr>
+  <tr><td>带调试符号的优化构建</td><td><code>REL_WITH_DEB_INFO=1 ...</code></td></tr>
+  <tr><td>关闭 CUDA</td><td><code>USE_CUDA=0 ...</code></td></tr>
+  <tr><td>只构建 C++ 库</td><td><code>BUILD_PYTHON=0 python tools/build_libtorch.py</code></td></tr>
+  <tr><td>指定 CUDA 架构</td><td><code>TORCH_CUDA_ARCH_LIST="8.0;9.0" ...</code></td></tr>
+  <tr><td>纯 wheel</td><td><code>python -m build --wheel --no-isolation</code></td></tr>
+  <tr><td>看最终配置</td><td><code>-v</code> 日志里搜 <code>******** Summary ********</code></td></tr>
+  <tr><td>看编译命令</td><td><code>ninja -C build -t commands</code></td></tr>
+  <tr><td>看依赖图</td><td><code>ninja -C build -t graph | dot -Tsvg &gt; g.svg</code></td></tr>
+  <tr><td>子模块状态</td><td><code>git submodule status</code></td></tr>
+  <tr><td>官方开发 CLI</td><td><code>spin develop</code> / <code>spin install</code></td></tr>
+</table>
+
+<div class="callout warn">
+  <b class="t">本仓库的两条硬规则</b>
+  ① 构建只走 <code>pip install -e . -v --no-build-isolation</code>，不要用别的命令；
+  ② <code>.ci/docker/</code> 下任何改动（包括 README）都会改变内容哈希、触发全量镜像重建，非必要不要动。
+</div>
+
+<p class="mini" style="margin-top:40px;border-top:1px solid var(--line);padding-top:14px">
+  基于本机 <code>pytorch/pytorch</code>（<code>2.16.0a0</code>，HEAD <code>5a98911762f</code>）的 <code>pyproject.toml</code>、<code>CMakeLists.txt</code>、
+  <code>cmake/*.cmake</code>、<code>setup.py</code>、<code>.spin/cmds.py</code>、<code>.ci/</code> 实际内容整理 · 2026-11
+</p>
+
+</main>
+</div>
+
+<script>
+// 为折叠题增加「全部展开/收起」快捷键：按 e 切换
+(function(){
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'e' || e.metaKey || e.ctrlKey || e.altKey) return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    var ds = document.querySelectorAll('details');
+    var anyClosed = Array.prototype.some.call(ds, function(d){ return !d.open; });
+    ds.forEach(function(d){ d.open = anyClosed; });
+  });
+})();
+</script>
+</body>
+</html>

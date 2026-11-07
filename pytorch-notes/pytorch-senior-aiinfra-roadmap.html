@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PyTorch 深度学习路线 · 对标 Google / OpenAI AI Infra 资深工程师</title>
+<style>
+  :root{
+    --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --line:#e7e5e4;
+    --card:#ffffff; --accent:#2563eb; --accent-soft:#eff6ff;
+    --green:#16a34a; --green-soft:#f0fdf4;
+    --amber:#d97706; --amber-soft:#fffbeb;
+    --red:#dc2626; --red-soft:#fef2f2;
+    --violet:#7c3aed; --violet-soft:#f5f3ff;
+    --code-bg:#f5f5f4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0c0a09; --fg:#e7e5e4; --muted:#a8a29e; --line:#292524;
+      --card:#1c1917; --accent:#60a5fa; --accent-soft:#172554;
+      --green:#4ade80; --green-soft:#052e16;
+      --amber:#fbbf24; --amber-soft:#2a1d05;
+      --red:#f87171; --red-soft:#2a0a0a;
+      --violet:#a78bfa; --violet-soft:#1e1b4b;
+      --code-bg:#292524;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Segoe UI,sans-serif}
+  .layout{display:grid;grid-template-columns:250px minmax(0,1fr);max-width:1200px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 16px 40px 24px;
+    border-right:1px solid var(--line);font-size:14px}
+  nav .brand{font-weight:700;margin-bottom:6px;line-height:1.4}
+  nav .brand small{display:block;color:var(--muted);font-weight:400;font-size:12px;margin-top:2px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:3px 8px;border-radius:6px;margin:1px 0}
+  nav a:hover{background:var(--accent-soft);color:var(--accent)}
+  nav .sep{margin:14px 8px 4px;font-size:11.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  main{padding:40px 40px 120px;min-width:0}
+  h1{font-size:2rem;margin:0 0 6px;line-height:1.3}
+  .sub{color:var(--muted);margin:0 0 24px}
+  h2{font-size:1.45rem;margin:56px 0 14px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:1.12rem;margin:26px 0 8px}
+  h4{font-size:.98rem;margin:20px 0 6px;color:var(--muted);letter-spacing:.02em}
+  p{margin:10px 0}
+  code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code-bg);
+    padding:1px 6px;border-radius:5px;word-break:break-word}
+  pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow:auto;border:1px solid var(--line);font-size:13px}
+  pre code{background:none;padding:0}
+  a{color:var(--accent)}
+  .callout{border-radius:10px;padding:12px 16px;margin:16px 0;border:1px solid var(--line)}
+  .callout.tip{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 35%,transparent)}
+  .callout.warn{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 35%,transparent)}
+  .callout.info{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+  .callout.bad{background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 35%,transparent)}
+  .callout b.t{display:block;margin-bottom:2px}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14.5px;background:var(--card);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--code-bg);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  ul,ol{padding-left:22px;margin:8px 0}
+  li{margin:4px 0}
+  .goal{border-left:3px solid var(--accent);padding:2px 12px;margin:12px 0}
+
+  /* progress */
+  .progress-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:20px 0;
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .progress-card .lbl{font-size:13px;color:var(--muted)}
+  .bar{flex:1;min-width:180px;height:10px;background:var(--code-bg);border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+  .progress-card b{font-variant-numeric:tabular-nums}
+  button.reset{font:inherit;font-size:13px;padding:4px 12px;border-radius:8px;border:1px solid var(--line);
+    background:var(--card);color:var(--muted);cursor:pointer}
+  button.reset:hover{color:var(--red);border-color:var(--red)}
+
+  /* phase card */
+  .phase{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 24px 14px;margin:24px 0}
+  .ph-head{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-bottom:2px}
+  .ph-head h3{margin:0;font-size:1.18rem}
+  .pnum{font:700 13px/1 ui-monospace,Menlo,monospace;color:#fff;background:var(--accent);
+    border-radius:8px;padding:6px 8px;align-self:center}
+  .pnum.v{background:var(--violet)}
+  .pnum.g{background:var(--green)}
+  .pnum.a{background:var(--amber)}
+  .pcount{font-size:12.5px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px 18px;margin:12px 0 4px;
+    font-size:13.5px;padding:10px 12px;background:var(--code-bg);border-radius:10px}
+  .kv b{display:block;color:var(--muted);font-weight:500;font-size:11.5px;letter-spacing:.04em}
+  .path{display:inline-block;font:12.5px/1.5 ui-monospace,Menlo,monospace;background:var(--code-bg);
+    padding:1px 7px;border-radius:5px;margin:1px 0}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;margin-right:4px;border:1px solid var(--line)}
+  .tag.must{background:var(--red-soft);color:var(--red)}
+  .tag.core{background:var(--accent-soft);color:var(--accent)}
+  .tag.opt{background:var(--green-soft);color:var(--green)}
+  .accept{border:1px dashed color-mix(in srgb,var(--green) 45%,transparent);background:var(--green-soft);
+    border-radius:10px;padding:10px 16px;margin:14px 0 10px}
+  .accept > b{display:block;font-size:13px;color:var(--green);margin-bottom:2px}
+  .accept li{list-style:none;margin-left:-20px;font-size:14.5px}
+  .accept input{margin-right:7px;vertical-align:-1px;accent-color:var(--green)}
+  .labs li{margin:7px 0}
+  .labs b{color:var(--accent)}
+  details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:10px 0}
+  details[open]{padding-bottom:12px}
+  summary{cursor:pointer;font-weight:600;font-size:14.5px}
+  summary::marker{color:var(--muted)}
+  .q{margin:8px 0 2px;font-weight:600}
+  .a{color:var(--muted);margin:0 0 10px}
+  .a b{color:var(--fg)}
+  .mini{font-size:13px;color:var(--muted)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr}
+    nav{display:none}
+    main{padding:24px 18px 80px}
+    .cols{grid-template-columns:1fr}
+  }
+  @media print{
+    nav{display:none}.layout{display:block}main{padding:0}
+    .phase{break-inside:avoid}details{display:block}details > *{display:block}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav>
+  <div class="brand">PyTorch → Senior AI Infra<small>对标 Google / OpenAI</small></div>
+  <a href="#how">怎么用这份路线</a>
+  <a href="#model">能力模型：什么叫 senior</a>
+  <a href="#plan">总览与时间预算</a>
+  <a href="#env">算力与环境</a>
+  <div class="sep">主线</div>
+  <a href="#p0">0 · 工具链与基线</a>
+  <a href="#p1">1 · Tensor / Dispatcher / Autograd</a>
+  <a href="#p2">2 · torch.compile 全栈</a>
+  <a href="#p3">3 · GPU 与 Kernel 工程</a>
+  <a href="#p4">4 · 分布式训练</a>
+  <a href="#p5">5 · 推理系统</a>
+  <a href="#p6">6 · 大规模训练系统</a>
+  <a href="#p7">7 · 上游贡献</a>
+  <a href="#p8">8 · 面试与能力验证</a>
+  <div class="sep">方法</div>
+  <a href="#projects">北极星项目</a>
+  <a href="#cadence">每周节奏</a>
+  <a href="#debug">性能诊断清单</a>
+  <a href="#res">资源库</a>
+  <a href="#quiz">自测题库</a>
+  <a href="#anti">失败模式</a>
+  <a href="#progress">进度总览</a>
+</nav>
+
+<main>
+<h1>PyTorch 深度学习路线</h1>
+<p class="sub">
+  目标：达到 Google / OpenAI AI Infra 资深工程师（L5 / Senior）的实际工作能力，而不是「会调 <code>torch.compile</code>」。
+  文中源码路径均基于本机仓库 <code>pytorch/pytorch</code>（HEAD <code>5a98911762f</code>，2026-11）实测存在；引用函数名而非行号，避免版本漂移。
+</p>
+
+<div class="callout info">
+  <b class="t">一句话主线</b>
+  一个 tensor 从 Python 表达式出发，依次穿过 <b>Dispatcher → Autograd → 编译栈（Dynamo/AOTAutograd/Inductor）→ GPU kernel → 集合通信</b> 五层。
+  资深工程师和普通使用者的差别不是「知道这五层存在」，而是<b>任何一层出问题，能在 30 分钟内定位到具体一层、给出证据、并修掉</b>。
+  整份路线就是把这五层逐层打通，再用分布式与推理两个真实系统把它们串起来。
+</div>
+
+<h2 id="how">怎么用这份路线</h2>
+<div class="cols">
+  <div>
+    <h3>三条硬规则</h3>
+    <ol>
+      <li><b>每个阶段必须有可运行产物。</b>没有 lab 的阶段等于没学。路线里每个阶段都给了「验收标准」，全部带勾选框。</li>
+      <li><b>先 profiling 后结论。</b>任何性能判断都要有 <code>ncu</code> / <code>nsys</code> / <code>torch.profiler</code> 的数字支撑，禁止「我觉得」。</li>
+      <li><b>读源码用「假设—验证」法。</b>先猜这段代码怎么工作，再打断点/加日志验证；禁止从第一行顺序读到大结局。</li>
+    </ol>
+  </div>
+  <div>
+    <h3>不做什么</h3>
+    <ul>
+      <li>不刷教程视频。以源码、论文、官方 dev-discuss 为主，视频只在卡住时看。</li>
+      <li>不追求学完再动手。阶段 2 和阶段 3 本身就要求交叉进行。</li>
+      <li>不在没有 GPU 的机器上死磕 kernel。见 <a href="#env">算力与环境</a>。</li>
+      <li>不把「读完」当里程碑。里程碑只有：跑通、测出数字、解释清楚、提交 PR。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout warn">
+  <b class="t">关于「资深」的诚实说明</b>
+  PyTorch 是底座，不是全部。senior AI Infra 的能力 = 框架内部理解 × 系统设计 × 性能工程 × 协作影响力。
+  这份路线按 <b>约 15 小时/周、36 周</b>设计（约 540 小时）。全职投入（35–40h/周）可压缩到 4–5 个月。
+  低于 8h/周建议把周期乘以 2，否则 lab 会退化成「看一遍代码」。
+</div>
+
+<h2 id="model">能力模型：什么叫 senior</h2>
+<p>用可观察的行为定义，而不是「熟悉 / 精通」这种无法验证的词。</p>
+<table>
+  <tr>
+    <th style="width:15%">维度</th>
+    <th style="width:22%">L3 · 熟练使用</th>
+    <th style="width:22%">L4 · 能改</th>
+    <th style="width:26%">L5 · 资深（本路线目标）</th>
+    <th style="width:15%">怎么被验证</th>
+  </tr>
+  <tr>
+    <td><b>框架内部</b></td>
+    <td>知道 dispatcher / autograd 存在，能写自定义算子</td>
+    <td>能读懂 <code>native_functions.yaml</code> 到 kernel 的链路，能加 decomposition</td>
+    <td>能判断一个改动该落在哪一层（schema / dispatch / decomposition / lowering / kernel），并预判 BC 影响</td>
+    <td>现场给一个 op，画出它的完整调用链</td>
+  </tr>
+  <tr>
+    <td><b>编译栈</b></td>
+    <td>会用 <code>torch.compile</code>，会看 graph break</td>
+    <td>能读生成的 Triton，能定位 recompile 原因</td>
+    <td>能解释每个 fusion 决策与 kernel 选择；能改 Inductor lowering / template；能设计动态 shape 策略</td>
+    <td>给定模型，说出 kernel 数、融合原因、bound 类型</td>
+  </tr>
+  <tr>
+    <td><b>Kernel</b></td>
+    <td>会写简单 Triton kernel</td>
+    <td>能写 FA / GEMM 级别 kernel 并调优</td>
+    <td>能从 roofline 推出理论上限，用 ncu 计数器定位到 stall 原因，逼近 cuBLAS/CUTLASS</td>
+    <td>4096³ GEMM ≥ 70% cuBLAS；FA 前向 ≤ 1.3× FA2</td>
+  </tr>
+  <tr>
+    <td><b>分布式</b></td>
+    <td>会用 DDP / FSDP 跑通</td>
+    <td>能调 bucket、reshard、TP 切分，能算显存</td>
+    <td>能设计 3D 并行方案并论证通信量；能诊断 hang / 数值不一致 / 扩展性劣化</td>
+    <td>给出 100B 模型 512 卡方案与通信量估算</td>
+  </tr>
+  <tr>
+    <td><b>推理</b></td>
+    <td>会部署 vLLM</td>
+    <td>能调 batching、量化、TP，能测 TTFT/TPOT</td>
+    <td>能设计 P/D 分离、KV 管理、投机解码方案，并给出 SLO 下的容量规划</td>
+    <td>手写 mini serving engine 达到 vLLM 70% 吞吐</td>
+  </tr>
+  <tr>
+    <td><b>性能工程</b></td>
+    <td>会用 profiler 看耗时</td>
+    <td>能定位热点并做有效优化</td>
+    <td>能从第一性原理预估性能上限，优化前就知道能提升多少</td>
+    <td>盲测：给一个慢 20% 的任务，30 分钟内给出根因假设</td>
+  </tr>
+  <tr>
+    <td><b>影响力</b></td>
+    <td>能提 issue</td>
+    <td>能 land 小 PR</td>
+    <td>能写 design doc、带项目、review 别人的设计、在社区有可识别的贡献</td>
+    <td>≥ 10 个 merged PR + 1 篇 design doc</td>
+  </tr>
+</table>
+
+<div class="callout tip">
+  <b class="t">senior 的真正标志</b>
+  <b>预测能力</b>：动手之前就能说出「这个改动大概提升 15%，瓶颈会从 HBM 转到 launch overhead」。
+  预测能力只能来自「理论 + 大量 profiling 反馈」的闭环，这也是本路线每个 lab 都强制要求记录数字的原因。
+</div>
+
+<h2 id="plan">总览与时间预算</h2>
+<table>
+  <tr><th>阶段</th><th>内容</th><th>周</th><th>工作量</th><th>核心产物</th></tr>
+  <tr><td><b>0</b></td><td>工具链、源码构建、profiling 环境、基线</td><td>1</td><td>15h</td><td>能 build + 跑通 profiler + 一份基线 benchmark</td></tr>
+  <tr><td><b>1</b></td><td>Tensor / Dispatcher / Autograd</td><td>2–4</td><td>45h</td><td>端到端自定义算子（CUDA + meta + autograd + decomposition + test）</td></tr>
+  <tr><td><b>2</b></td><td>Dynamo / AOTAutograd / Inductor / export / AOTI</td><td>5–10</td><td>90h</td><td>自定义 lowering + Triton template + 修 graph break</td></tr>
+  <tr><td><b>3</b></td><td>GPU 架构、Triton、CUDA、CUTLASS、Attention、profiling</td><td>8–15</td><td>110h</td><td>FA2 前向 + 高性能 GEMM + ncu 报告</td></tr>
+  <tr><td><b>4</b></td><td>NCCL / DDP / FSDP2 / DTensor / TP / PP / CP</td><td>16–21</td><td>90h</td><td>1B 模型 8 卡训练 + TP 手写 + 故障演练</td></tr>
+  <tr><td><b>5</b></td><td>PagedAttention、continuous batching、量化、投机、P/D 分离</td><td>22–27</td><td>90h</td><td>mini serving engine + 量化对比 + SLO 报告</td></tr>
+  <tr><td><b>6</b></td><td>MFU、优化器、checkpoint、容错、集群</td><td>28–32</td><td>75h</td><td>小 LM 端到端训练 + 扩展性曲线</td></tr>
+  <tr><td><b>7</b></td><td>上游贡献（全程穿插）</td><td>全程</td><td>2h/w</td><td>≥ 10 merged PR</td></tr>
+  <tr><td><b>8</b></td><td>面试与能力验证</td><td>33–35</td><td>30h</td><td>系统设计 mock + 题库全过</td></tr>
+</table>
+
+<div class="callout info">
+  <b class="t">并行关系（重要）</b>
+  阶段 2 和阶段 3 必须交叉：第 8 周开始一边读 Inductor 一边写 Triton，两者互相解释。
+  阶段 6 可以在阶段 4 结束后立刻做，也可以和阶段 5 交替（训练系统和推理系统共享大量底层知识）。
+  <b>不要串行地把每阶段「学完」再走</b>——很多概念需要第二轮才真正理解，路线设计为螺旋式。
+</div>
+
+<h3>如果你想更快（压缩版）</h3>
+<table>
+  <tr><th>目标</th><th>可压缩</th><th>不可压缩</th></tr>
+  <tr><td>6 个月 / 25h 周</td><td>阶段 6 缩到 3 周；阶段 8 缩到 1 周；资源库只读标 <span class="tag must">必读</span> 的</td><td>阶段 1、2、3 的 lab；阶段 4 的故障演练</td></tr>
+  <tr><td>专攻推理方向</td><td>阶段 6 可后置；阶段 4 只需 DDP/FSDP/TP</td><td>阶段 3 的 attention kernel；阶段 5 全部</td></tr>
+  <tr><td>专攻训练方向</td><td>阶段 5 缩到 2 周</td><td>阶段 4 全部；阶段 6 全部</td></tr>
+</table>
+
+<h2 id="env">算力与环境</h2>
+<div class="callout bad">
+  <b class="t">先解决这个，否则后面全是纸上谈兵</b>
+  当前机器是 macOS（Darwin），无 CUDA。阶段 3 之后几乎所有 lab 都需要 <b>NVIDIA GPU</b>。
+  这不是可选项：kernel 工程、NCCL、FP8、ncu 在 Apple Silicon 上都无法真实训练。
+</div>
+
+<h3>最低配置建议</h3>
+<table>
+  <tr><th>用途</th><th>硬件</th><th>说明</th></tr>
+  <tr><td>阶段 1（框架内部）</td><td>本机 CPU 即可</td><td>dispatcher / autograd lab 不需要 GPU</td></tr>
+  <tr><td>阶段 2（编译栈）</td><td>1× A100/H100 或 4090</td><td>读生成的 Triton 需要真实 GPU；Inductor CPU 后端也能学调度</td></tr>
+  <tr><td>阶段 3（kernel）</td><td>1× H100 最佳；A100 次之</td><td>TMA / warp specialization / FP8 需要 Hopper+；4090 可学基础</td></tr>
+  <tr><td>阶段 4（分布式）</td><td>8× GPU 单机（NVLink）</td><td>至少要 4 卡才能观察 ring all-reduce 行为；多机更好</td></tr>
+  <tr><td>阶段 5（推理）</td><td>1–8× GPU</td><td>7B 模型单卡可跑；70B 需 4–8 卡</td></tr>
+  <tr><td>阶段 6（大规模）</td><td>8–64× GPU</td><td>可用云上按小时租，或参加开源算力计划</td></tr>
+</table>
+
+<h3>现实做法（按性价比排序）</h3>
+<ol>
+  <li><b>单卡按需租用</b>（Modal / RunPod / Lambda / 阿里云/火山）：阶段 2–3 每天 2–3 小时，成本可控。优先 H100（能学 TMA/FP8）。</li>
+  <li><b>8 卡整机短租</b>：阶段 4/6 的周末集中跑。8×H100 每小时成本较高，务必先把单卡逻辑调通再上多卡。</li>
+  <li><b>学术/开源算力申请</b>：各云厂商的 research credits、HuggingFace 社区 GPU、Kaggle/Colab 兜底。</li>
+  <li><b>本地小卡</b>：4090 24GB 能覆盖阶段 1、2、3 的大部分和阶段 5 的 7B 推理，是很好的日常开发机。</li>
+</ol>
+
+<div class="callout tip">
+  <b class="t">环境纪律</b>
+  为每个阶段固定一个镜像并记录版本（CUDA / driver / PyTorch commit / Triton 版本 / NCCL 版本）。
+  性能数字离开版本没有意义。建议在 <code>agent_space/</code> 下维护一个 <code>env.md</code>，每次实验记一行。
+</div>
+
+<h3>必须装好的工具</h3>
+<pre><code># 构建（见仓库 CLAUDE.md）
+pip install -e . -v --no-build-isolation
+
+# 代码质量
+spin lint / spin fixlint
+lintrunner -a
+
+# 性能
+nsys --version          # Nsight Systems：时间线、通信、CPU 阻塞
+ncu --version           # Nsight Compute：单 kernel 计数器
+python -c "import torch; print(torch.__version__, torch.version.cuda)"
+
+# PyTorch 自带
+torch.profiler          # 端到端 trace，可导出 chrome trace
+TORCH_LOGS=+inductor    # 编译栈日志
+tlparse                 # 解析结构化 trace（生产环境调试）
+</code></pre>
+
+<h2 id="p0">阶段 0 · 工具链与基线（1 周）</h2>
+<section class="phase" id="p0-card">
+  <div class="ph-head"><span class="pnum">00</span><h3>把仓库变成你的实验室</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>1 周 · 15h</span></div>
+    <div><b>前置</b><span>能读 C++ / Python</span></div>
+    <div><b>产出</b><span>可复现的构建 + 基线数字</span></div>
+  </div>
+  <p class="goal">目标不是学知识，而是消除后续所有阶段的摩擦：构建、测试、lint、profiling、日志、源码导航，全部顺手。</p>
+
+  <h4>要做的事</h4>
+  <ol class="labs">
+    <li><b>源码构建一次。</b>按仓库约定 <code>pip install -e . -v --no-build-isolation</code>。记录耗时、遇到的坑、是否启用 CUDA。之后增量构建要能在 5 分钟内完成。</li>
+    <li><b>跑通测试框架。</b>读 <code>torch/testing/_internal/common_utils.py</code>，写一个 <code>TestCase</code>，用 <code>run_tests()</code> 跑；理解 <code>instantiate_device_type_tests</code> 如何生成 CPU/CUDA 两套测试。</li>
+    <li><b>跑通 lint。</b><code>spin lint</code>、<code>spin fixlint</code>、<code>lintrunner -a</code>。理解 B950 与 noqa 规则（仓库 CLAUDE.md）。</li>
+    <li><b>建立源码地图。</b>自己画一张目录职责图：<code>c10/</code>（基础类型）、<code>aten/</code>（算子）、<code>torch/csrc/</code>（绑定、autograd、distributed）、<code>torch/_dynamo/</code>、<code>torch/_inductor/</code>、<code>torch/distributed/</code>、<code>torchgen/</code>。手画，别复制。</li>
+    <li><b>装好 profiling 三件套并各跑一次</b>：<code>torch.profiler</code>（导出 trace）、<code>nsys profile</code>、<code>ncu</code>。用一个 matmul 即可。</li>
+    <li><b>建立实验记录模板</b>：日期 / commit / 硬件 / 命令 / 关键数字 / 结论。后面所有 lab 都往里填。</li>
+  </ol>
+
+  <h4>源码坐标</h4>
+  <table>
+    <tr><th>路径</th><th>看什么</th><th>深度</th></tr>
+    <tr><td><span class="path">CONTRIBUTING.md</span></td><td>提交、测试、CI、review 流程</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/testing/_internal/common_utils.py</span></td><td><code>TestCase</code>、<code>run_tests</code>、设备参数化</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_logging/</span></td><td><code>TORCH_LOGS</code> 机制、<code>trace_structured</code></td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">benchmarks/dynamo/</span></td><td>官方 benchmark 怎么跑、指标怎么定义</td><td><span class="tag opt">浏览</span></td></tr>
+    <tr><td><span class="path">.ci/</span></td><td>CI 如何选择测试；不要改 <code>.ci/docker/</code></td><td><span class="tag opt">浏览</span></td></tr>
+  </table>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p0-1">能从干净状态构建成功，并说清增量构建触发条件</li>
+      <li><input type="checkbox" data-k="p0-2">能写一个带 <code>@parametrize</code> + <code>instantiate_device_type_tests</code> 的测试并跑通</li>
+      <li><input type="checkbox" data-k="p0-3">能用 <code>ncu</code> 对一个 kernel 输出 speed-of-light 报告并读懂前三行</li>
+      <li><input type="checkbox" data-k="p0-4">能凭记忆画出源码目录职责图</li>
+      <li><input type="checkbox" data-k="p0-5">有一份基线 benchmark 数字（如 4096³ bf16 matmul 的 TFLOPS）</li>
+    </ul>
+  </div>
+</section>
+
+<h2 id="p1">阶段 1 · Tensor / Dispatcher / Autograd（3 周）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum">01</span><h3>一个 tensor 到底经过了什么</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>3 周 · 45h</span></div>
+    <div><b>前置</b><span>阶段 0</span></div>
+    <div><b>产出</b><span>1 个完整自定义算子 + 1 篇调用链笔记</span></div>
+  </div>
+  <p class="goal">建立「任何 Python 表达式都能拆成 5 层」的心智模型。这一层不透，后面所有调试都是猜。</p>
+
+  <h4>必须建立的心智模型</h4>
+  <ul>
+    <li><b>Tensor 是 3 个东西的组合</b>：<code>TensorImpl</code>（元数据：sizes、strides、storage_offset、DispatchKeySet、autograd meta）+ <code>Storage</code>（真实内存）+ 一个 dtype/layout 标签。view 只改元数据，<code>contiguous()</code> 才分配内存。所有「为什么这个 op 慢」的问题，先问 stride。</li>
+    <li><b>Dispatcher 是按 key 查表</b>：一次调用先算 <code>DispatchKeySet</code>（backend key + functionality key，如 <code>AutogradCPU</code>、<code>Functionalize</code>、<code>Python</code>、<code>Meta</code>、<code>Fake</code>），再按优先级找第一个注册的 kernel，找不到走 fallback。理解优先级顺序，就理解了「为什么 autograd 包在外面、functionalization 包在里面」。</li>
+    <li><b>schema 是契约</b>：<code>native_functions.yaml</code> 里的 <code>dispatch:</code> 决定每个 backend 实现什么；<code>CompositeImplicitAutograd</code> 表示「这个 op 由别的 op 组合而成，autograd 自动可用」。这决定了你新加算子该写 C++ kernel 还是写 decomposition。</li>
+    <li><b>Autograd 是反向图 + 引擎</b>：前向时每个 op 的 <code>Node</code> 通过 <code>next_edges</code> 连成 DAG；反向时引擎把「入度归零」的节点放进 ready queue 并行执行。<code>SavedVariable</code> 保存反向需要的张量，版本计数器保证 in-place 安全。</li>
+    <li><b>functionalization 把可变 op 变成不可变</b>：编译栈要求图无副作用，所以 <code>add_</code> 会被改写成「读 + 写回」。这是理解 Inductor 图和 <code>torch.export</code> 的前提。</li>
+    <li><b>view / alias 是一等公民</b>：<code>ViewAndMutationMeta</code> 记录了哪些输出是输入的别名，这直接影响 AOTAutograd 能否安全地重排、以及 FSDP 能否原地 reduce-scatter。</li>
+  </ul>
+
+  <h4>源码坐标</h4>
+  <table>
+    <tr><th>路径</th><th>看什么</th><th>深度</th></tr>
+    <tr><td><span class="path">c10/core/TensorImpl.h</span></td><td>sizes/strides/storage_offset、key_set、autograd meta 的存储方式</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">c10/core/DispatchKey.h</span></td><td>所有 key、backend vs functionality、优先级顺序</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">aten/src/ATen/core/dispatch/Dispatcher.h</span></td><td>注册表、<code>callBoxed</code>/<code>call</code>、fallback</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">aten/src/ATen/native/native_functions.yaml</span></td><td>挑 3 个 op（<code>add</code>、<code>mm</code>、<code>layer_norm</code>）看 dispatch 声明差异</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torchgen/gen.py</span> · <span class="path">torchgen/model.py</span></td><td>yaml 如何变成 C++ 与 Python 绑定</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/csrc/autograd/engine.cpp</span></td><td>GraphTask、ready queue、reentrant backward、多线程</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/csrc/autograd/functions/accumulate_grad.h</span></td><td>梯度累加、dtype 提升、leaf 语义</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">tools/autograd/derivatives.yaml</span></td><td>反向公式的声明式定义</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_subclasses/fake_tensor.py</span> · <span class="path">meta_utils.py</span></td><td>无数据时的 shape/stride 传播（阶段 2 精读）</td><td><span class="tag opt">先浏览</span></td></tr>
+    <tr><td><span class="path">torch/_library/custom_ops.py</span></td><td>现代自定义算子 API（lab 用）</td><td><span class="tag must">必读</span></td></tr>
+  </table>
+
+  <h4>Lab</h4>
+  <ol class="labs">
+    <li><b>调用链追踪。</b>对 <code>torch.nn.functional.layer_norm</code> 做一次完整追踪：Python → <code>_C._VariableFunctions</code> → dispatcher → AutogradCPU kernel → CPU kernel。用 <code>TORCH_SHOW_DISPATCH_TRACE=1</code> 与 <code>torch._C._dispatch_dump_table("aten::layer_norm")</code> 交叉验证。产出一张图。</li>
+    <li><b>手写完整算子。</b>实现 <code>myops::fused_scale_add(Tensor x, Tensor y, float a, float b) -&gt; Tensor</code>：CUDA kernel + CPU 参考实现 + Meta 实现 + autograd（用 <code>torch.library</code> 或 <code>derivatives.yaml</code>）+ decomposition（给 Inductor 用）+ 测试（<code>instantiate_device_type_tests</code>、gradcheck）。<b>要求它能被 <code>torch.compile</code> 正常编译</b>。</li>
+    <li><b>autograd 解剖。</b>构造 <code>y = (x @ w).relu().sum()</code>，打印 <code>y.grad_fn</code> 及其 <code>next_functions</code> 递归结构；用 <code>torch.autograd.set_multithreading_enabled(False)</code> 对比执行顺序；解释 <code>SavedVariable</code> 保存了什么、为什么 <code>relu</code> 只需存 output。</li>
+    <li><b>in-place 报错复现。</b>复现 "a view of a leaf Variable that requires grad is being used in an in-place operation"，从 <code>VariableVersion</code> / <code>version_counter</code> 的角度解释。</li>
+    <li><b>写一个 tensor subclass。</b>用 <code>__torch_dispatch__</code> 实现一个「记录所有 op 调用 + 统计 FLOPs」的包装张量。这是理解 subclass 机制与 torch function mode 的最快路径。</li>
+    <li><b>functionalization 观察。</b>用 <code>torch._enable_functionalization()</code> 或 Inductor 日志观察 <code>add_</code> 如何被改写；说明为什么编译器需要它。</li>
+  </ol>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p1-1">能不看代码，从 <code>y = x @ w</code> 讲到 CUDA kernel 的 5 层，并说出每层的输入输出</li>
+      <li><input type="checkbox" data-k="p1-2">自定义算子通过 correctness + gradcheck 测试，且 <code>torch.compile</code> 后无 graph break</li>
+      <li><input type="checkbox" data-k="p1-3">能解释 DispatchKeySet 的优先级，并说明 <code>AutogradCPU</code> 与 <code>CPU</code> 的包裹关系</li>
+      <li><input type="checkbox" data-k="p1-4">能用 <code>grad_fn</code> 图解释 double backward 为什么可行</li>
+      <li><input type="checkbox" data-k="p1-5">能说清 view / alias 对编译器与分布式的影响，并举一个实际例子</li>
+      <li><input type="checkbox" data-k="p1-6">写出一篇 2000 字以内的调用链笔记，且别人能按图复现</li>
+    </ul>
+  </div>
+
+  <details><summary>常见误区</summary>
+    <p class="mini">
+      ① 一上来逐行读 <code>engine.cpp</code> 3000 行——应该先读 <code>GraphTask</code> 结构和 <code>execute_with_graph_task</code> 主循环，其余按需。<br>
+      ② 以为 autograd 是「记录操作序列」——它是 DAG + 引擎，且反向可以被多次触发（<code>retain_graph</code>）。<br>
+      ③ 以为 <code>contiguous()</code> 总是拷贝——已经连续时是 no-op，这正是很多「优化无效」的原因。<br>
+      ④ 新算子只写计算 kernel，忘了 meta / fake / decomposition，结果 <code>torch.compile</code> 直接 graph break。
+    </p>
+  </details>
+</section>
+
+<h2 id="p2">阶段 2 · torch.compile 全栈（6 周）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum">02</span><h3>Dynamo → AOTAutograd → Inductor → export/AOTI</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>6 周 · 90h</span></div>
+    <div><b>前置</b><span>阶段 1</span></div>
+    <div><b>产出</b><span>lowering + template + 一份编译报告</span></div>
+  </div>
+  <p class="goal">这是整条路线最值钱的一段。能做到「给定任意模型，说清它被编译成了什么、为什么这么编译」，就已经超过大多数使用者。</p>
+
+  <h4>2.1 Dynamo：图捕获</h4>
+  <ul>
+    <li><b>机制</b>：通过 CPython 的 frame evaluation hook（PEP 523）接管字节码执行，把 Python 字节码逐条翻译成 FX 图；遇到无法静态化的操作就 <b>graph break</b>，回退到 eager。</li>
+    <li><b>VariableTracker</b>：Dynamo 不执行真实 Python 对象，而是对 <code>VariableTracker</code> 抽象解释。<code>TensorVariable</code>、<code>SymNodeVariable</code>、<code>UnspecializedPythonVariable</code> 的区别决定了何时特化、何时泛化。</li>
+    <li><b>Guards</b>：每个编译产物绑定一组守卫（类型、id、shape、值）。守卫失败即 recompile。理解 guard 就理解了「为什么改个 batch size 就变慢」。</li>
+    <li><b>动态 shape</b>：<code>automatic_dynamic_shapes</code> 在第二次遇到不同 shape 时把该维标记为 <code>SymInt</code>；<code>assume_static_by_default</code>、<code>specialize_int</code> 决定特化粒度。动态 shape 会带来额外的 guard 与 kernel 分支。</li>
+    <li><b>HOPs</b>：<code>torch._higher_order_ops</code>（<code>cond</code>、<code>while_loop</code>、<code>scan</code>、<code>flex_attention</code>、<code>invoke_subgraph</code>）让控制流与 attention 保持在图内。</li>
+  </ul>
+
+  <h4>2.2 AOTAutograd：前向 + 反向一起编译</h4>
+  <ul>
+    <li>把 forward 图与 autograd 结合，生成 <b>joint graph</b>，再用 <b>min-cut partitioning</b> 切成 forward / backward 两张图。</li>
+    <li>切分点决定「哪些中间结果要存、哪些要重算」。这就是 activation checkpointing 在编译栈里的自然表达（<code>torch.utils.checkpoint</code> 会变成 <code>tag_activation_checkpoint</code> HOP）。</li>
+    <li><code>ViewAndMutationMeta</code> 记录所有输入输出的 alias / mutation，是正确性的核心。</li>
+    <li><b>AOTAutogradCache</b>：按图 + 配置缓存编译结果，避免重复编译。</li>
+  </ul>
+
+  <h4>2.3 Inductor：从图到 kernel</h4>
+  <ul>
+    <li><b>Lowering</b>：FX 节点 → IR（<code>TensorBox</code>/<code>StorageBox</code>/<code>Loop</code>/<code>Pointwise</code>/<code>Reduction</code>/<code>Scan</code>/<code>ExternKernel</code>）。先查 decomposition 表，把复合算子拆成基础算子。</li>
+    <li><b>Scheduler</b>：决定 fusion、realize、内存复用。<b>融合的判据是「能否在同一个 loop 里完成且不重复计算」</b>，不是「看起来能合就合」。理解 <code>SchedulerNode</code> 的依赖边与 <code>why_fused</code>。</li>
+    <li><b>Codegen</b>：Triton（GPU）/ C++（CPU）/ Metal。看 <code>codegen/triton.py</code> 如何生成 <code>tl.load</code>/<code>tl.store</code>/mask/索引表达式。</li>
+    <li><b>模板与 autotune</b>：matmul、attention 等走 <code>select_algorithm.py</code> + <code>TritonTemplate</code>，对 tile size / num_warps / num_stages 做搜索，结果写入 autotune cache。</li>
+    <li><b>Epilogue fusion</b>：<code>mm</code> + bias + activation 合成一个 kernel；<code>kernel/mm.py</code> 展示了 prologue/epilogue 的组合方式。</li>
+    <li><b>CUDAGraphs</b>：<code>cudagraph_trees.py</code> 用内存池 + 静态输入消除 launch overhead。约束：shape 固定、不能有 CPU 同步、不能动态分配。</li>
+    <li><b>缓存</b>：<code>FxGraphCache</code>（图级）、<code>TritonFuture</code>（异步编译）、<code>codecache.py</code>（磁盘产物、打包）。冷启动优化全靠这一层。</li>
+  </ul>
+
+  <h4>2.4 export 与 AOTI</h4>
+  <ul>
+    <li><b><code>torch.export</code></b>：产出 <code>ExportedProgram</code>（纯函数、无 Python 语义、显式 dynamic shapes）。比 <code>torch.compile</code> 更严格，是部署路径的入口。</li>
+    <li><b>动态 shape 声明</b>：<code>torch.export.Dim</code> + <code>dynamic_shapes</code>，带约束（<code>min</code>/<code>max</code>/<code>mod</code>）。约束越紧，优化空间越大。</li>
+    <li><b>AOTI</b>：<code>torch._inductor.aoti_compile_and_package</code> 产出 <code>.so</code> + weights，C++ runner 加载，无需 Python。冷启动从秒级降到毫秒级，是推理部署的主流形态。</li>
+    <li><b>serde</b>：<code>torch/_export/serde/schema.py</code> 定义稳定序列化格式。</li>
+  </ul>
+
+  <h4>源码坐标</h4>
+  <table>
+    <tr><th>路径</th><th>看什么</th><th>深度</th></tr>
+    <tr><td><span class="path">torch/_dynamo/convert_frame.py</span></td><td>frame 捕获入口、异常转 graph break</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_dynamo/symbolic_convert.py</span></td><td>字节码 → FX 的主循环</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_dynamo/variables/tensor.py</span></td><td><code>TensorVariable</code> 的 op 分发</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_dynamo/guards.py</span></td><td>守卫生成与求值</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_dynamo/output_graph.py</span></td><td>图构建、guard 收集、recompile 计数</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/fx/experimental/symbolic_shapes.py</span></td><td>ShapeEnv、SymInt、约束求解</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_functorch/aot_autograd.py</span> · <span class="path">_functorch/_aot_autograd/</span></td><td>joint graph、min-cut、cache</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/graph.py</span> · <span class="path">ir.py</span></td><td>lowering 与 IR 定义</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/scheduler.py</span></td><td>融合决策、realize、内存规划</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/codegen/triton.py</span> · <span class="path">wrapper.py</span></td><td>Triton 代码生成、kernel 包装</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/select_algorithm.py</span></td><td>模板选择、autotune 流程</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/kernel/mm.py</span> · <span class="path">mm_common.py</span></td><td>GEMM 的 prologue/epilogue 组合</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/kernel/flex/flex_attention.py</span></td><td>flex attention 后端</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/decomposition.py</span></td><td>decomposition 注册表</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/config.py</span></td><td>所有可调开关（先通读一遍名字）</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/cudagraph_trees.py</span></td><td>CUDA graph 内存池与 replay</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/codecache.py</span></td><td>磁盘缓存、异步编译、打包</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_export/</span> · <span class="path">torch/export/_trace.py</span></td><td>ExportedProgram 生成</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/csrc/inductor/aoti_runner/</span></td><td>AOTI C++ 运行时的张量生命周期</td><td><span class="tag opt">浏览</span></td></tr>
+  </table>
+
+  <h4>Lab</h4>
+  <ol class="labs">
+    <li><b>读一遍生成的 Triton。</b>对 <code>nn.TransformerEncoderLayer</code> 开 <code>TORCH_LOGS=+inductor,+output_code</code>，把生成的每个 kernel 抄下来，逐个回答：输入输出 shape、融合了哪些 op、是 memory-bound 还是 compute-bound、理论带宽/算力利用率是多少。</li>
+    <li><b>解释融合决策。</b>在同样模型里人为插入 <code>.contiguous()</code>、<code>.item()</code>、随机数，观察哪些融合被破坏；用 <code>torch._inductor.metrics</code> 或 <code>why_fused</code> 日志解释。</li>
+    <li><b>修 graph break。</b>找一个真实模型（HuggingFace 上的 LLM 或自己写）里的 graph break，用 <code>torch._dynamo.explain</code> 定位，改写成可编译形式，量化 recompile 次数与端到端提升。</li>
+    <li><b>写 decomposition + lowering。</b>给阶段 1 的自定义算子写 decomposition，确认它进入 Inductor 图；再写一个 <code>@register_lowering</code>（或 <code>torch.library.custom_op</code> + fake）让它生成 Triton kernel。</li>
+    <li><b>写一个 Triton template。</b>在 <code>select_algorithm</code> 体系里加一个自定义模板（例如 fused residual + layernorm），让它参与 autotune，并打印搜索到的 config。</li>
+    <li><b>动态 shape 实验。</b>同一个模型，分别用 <code>dynamic=True/False</code>、不同 <code>Dim</code> 约束，测编译时间、kernel 数、稳态吞吐。解释差异来源。</li>
+    <li><b>AOTI 部署。</b><code>aot_compile</code> 一个模型，用 C++ runner 加载，测冷启动与稳态延迟，对比 <code>torch.compile</code> 首次调用。检查 <code>.so</code> 大小与权重打包方式。</li>
+    <li><b>CUDA graph 边界。</b>构造一个每次 shape 都变的输入，观察 <code>cudagraphs</code> 如何处理（重新 capture / 回退），并测 launch overhead 占比。</li>
+  </ol>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p2-1">给定任意模型，能在 30 分钟内输出：graph break 列表、kernel 列表、每个 kernel 的 bound 类型</li>
+      <li><input type="checkbox" data-k="p2-2">能解释 min-cut partitioning 为什么需要重算，并指出哪些中间结果被保存</li>
+      <li><input type="checkbox" data-k="p2-3">能说清 Dynamo guard 失败到 recompile 的完整路径，并给出减少 recompile 的 3 种手段</li>
+      <li><input type="checkbox" data-k="p2-4">自定义算子 + decomposition + lowering 全部跑通，且被 <code>torch.compile</code> 正确捕获</li>
+      <li><input type="checkbox" data-k="p2-5">能读懂任意一段 Inductor 生成的 Triton，并手算出它的理论耗时下界</li>
+      <li><input type="checkbox" data-k="p2-6">AOTI 产物能独立运行，且能解释其冷启动优势来源</li>
+      <li><input type="checkbox" data-k="p2-7">写一份编译报告：优化前后吞吐/延迟/编译时间/kernel 数对比</li>
+    </ul>
+  </div>
+
+  <details><summary>常见误区</summary>
+    <p class="mini">
+      ① 以为 <code>torch.compile</code> 是「把 Python 变快」——它捕获的是 tensor 计算图，Python 控制流只会被特化或打断。<br>
+      ② 看到 graph break 就加 <code>torch._dynamo.disable</code>——应该先判断这块是否值得编译。<br>
+      ③ 盲目 <code>max_autotune=True</code>——编译时间可能涨 10 倍，稳态只快 3%。<br>
+      ④ 以为动态 shape 一定更好——它增加 guard 和分支，短序列场景常常更慢。<br>
+      ⑤ 把 Inductor 当黑盒，不看生成的 kernel——所有调优都从这里开始。
+    </p>
+  </details>
+</section>
+
+<h2 id="p3">阶段 3 · GPU 与 Kernel 工程（8 周，与阶段 2 交叉）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum v">03</span><h3>从 roofline 到 FlashAttention</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>8 周 · 110h</span></div>
+    <div><b>前置</b><span>阶段 1；阶段 2 同步</span></div>
+    <div><b>产出</b><span>FA2 前向 + 高性能 GEMM + ncu 报告</span></div>
+  </div>
+  <p class="goal">目标不是「会写 kernel」，而是「写之前就知道能到多少性能、写完能用计数器解释差距」。</p>
+
+  <h4>3.1 硬件模型（必须先建立）</h4>
+  <ul>
+    <li><b>执行模型</b>：grid → block（CTA）→ warp → thread；SM 内 warp scheduler、寄存器文件、shared memory/L1；occupancy 决定能否掩盖延迟。</li>
+    <li><b>内存层级</b>：寄存器 → shared memory → L2 → HBM。合并访问（coalescing）、bank conflict、L2 命中率决定有效带宽。</li>
+    <li><b>Roofline</b>：算术强度 = FLOPs / Bytes。低于拐点就是 memory-bound，优化方向是减少访存或提高复用；高于拐点才谈 tensor core 利用率。</li>
+    <li><b>Hopper 特性</b>：TMA（<code>cp.async.bulk.tensor</code>，异步多维拷贝，不占寄存器）、thread block cluster + distributed shared memory、warp specialization（producer/consumer）、异步事务屏障 <code>mbarrier</code>。</li>
+    <li><b>Blackwell</b>：第五代 tensor core、FP4/FP6、更大 SM 内共享内存，kernel 设计进一步走向「TMA + warp specialization + 持久化」。</li>
+    <li><b>数值</b>：BF16/FP16 → FP32 accumulate；FP8 e4m3（权重/激活）vs e5m2（梯度）；per-tensor / per-channel / per-block scaling；delayed scaling；stochastic rounding。数值错误往往表现为「loss 缓慢漂移」，不是 NaN。</li>
+  </ul>
+
+  <h4>3.2 Triton 深入</h4>
+  <ul>
+    <li>block-level 编程模型、<code>tl.load/store</code> 的 mask 与 <code>other</code>、<code>make_block_ptr</code>、descriptor（TMA）。</li>
+    <li>layout 与 <code>num_warps</code>/<code>num_stages</code>：软件流水线的本质是「预取下一块 + 计算当前块」，stage 数就是缓冲区深度。</li>
+    <li><code>tl.dot</code> / <code>tl.dot_scaled</code>；reduce 与 <code>tl.associative_scan</code>（实现 cumsum/softmax）。</li>
+    <li>持久化 kernel（persistent）：减少 launch 与 tail effect，配合 stream-K 解决 GEMM 的 wave quantization。</li>
+    <li>自动调优：<code>triton.autotune</code>、config 空间设计、缓存复用。</li>
+  </ul>
+
+  <h4>3.3 GEMM 与 Attention</h4>
+  <ul>
+    <li><b>GEMM</b>：分块（tile）、寄存器分块、双缓冲、split-K、stream-K、epilogue fusion、TMA、warp specialization。目标是逼近 cuBLAS/CUTLASS。</li>
+    <li><b>CUTLASS/CuTe</b>：理解 tile 层级（CTA / warp / MMA）、layout 代数、epilogue 访存；不必从零写，但要能读 <code>third_party/cutlass</code> 的 kernel 结构。</li>
+    <li><b>Attention</b>：online softmax、分块避免 materialize N×N、GQA/MQA 的 KV 复用、causal mask 的块级跳过、FlashDecoding 的 split-KV、PagedAttention 的间接寻址、MLA 的低秩压缩。</li>
+    <li><b>FlexAttention</b>：用 block mask 表达任意稀疏模式，理解 <code>torch/nn/attention/flex_attention.py</code> 的 score-mod 与 mask 语义。</li>
+  </ul>
+
+  <h4>3.4 Profiling</h4>
+  <table>
+    <tr><th>工具</th><th>回答什么问题</th><th>关键指标</th></tr>
+    <tr><td><code>nsys</code></td><td>时间线上谁在等谁：kernel、memcpy、NCCL、CPU 阻塞、launch gap</td><td>GPU 利用率、gap 占比、通信与计算重叠度</td></tr>
+    <tr><td><code>ncu</code></td><td>单个 kernel 为什么慢</td><td>SM/Memory throughput、achieved occupancy、warp stall reasons、L2 hit、sectors/request</td></tr>
+    <tr><td><code>torch.profiler</code></td><td>Python 层归因、算子级耗时</td><td>self CUDA time、调用次数、trace 导出</td></tr>
+    <tr><td><code>do_bench</code></td><td>稳态延迟（排除 launch/预热）</td><td>median、IQR、L2 flush</td></tr>
+  </table>
+
+  <h4>源码坐标</h4>
+  <table>
+    <tr><th>路径</th><th>看什么</th><th>深度</th></tr>
+    <tr><td><span class="path">aten/src/ATen/native/cuda/Loops.cuh</span></td><td>PyTorch 通用 elementwise/reduction 的向量化与 grid 策略</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">aten/src/ATen/native/cuda/</span></td><td>挑 <code>Reduce.cuh</code>、<code>SoftMax.cu</code>、<code>ScanKernels.cpp</code>/<code>ScanUtils.cuh</code> 精读</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/runtime/triton_helpers.py</span></td><td>Inductor 生成代码依赖的 Triton 原语</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/kernel/mm.py</span> · <span class="path">mm_common.py</span></td><td>GEMM 模板与 epilogue 组合</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/kernel/flex/flex_attention.py</span></td><td>attention 模板与 block mask</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">third_party/cutlass/</span></td><td>需要 <code>git submodule update --init</code>；读 examples 与 CuTe layout</td><td><span class="tag opt">按需</span></td></tr>
+    <tr><td><span class="path">third_party/flash-attention/</span></td><td>FA2/FA3 参考实现</td><td><span class="tag core">精读</span></td></tr>
+  </table>
+
+  <h4>Lab（按顺序，难度递增）</h4>
+  <ol class="labs">
+    <li><b>Bandwidth 基线。</b>Triton 写 vector add / copy，测到 HBM 峰值的百分比；解释为什么达不到 100%。</li>
+    <li><b>Softmax。</b>写 row-wise softmax，处理非 2 的幂、mask、大行；对比 <code>torch.softmax</code>。</li>
+    <li><b>Fused LayerNorm + residual。</b>单 kernel 完成，测带宽；对比 eager 三 kernel 的差距。</li>
+    <li><b>GEMM。</b>从 naive 到 tiled 到 <code>tl.dot</code> + 双缓冲 + split-K，逐步加优化，每步用 ncu 记录瓶颈变化。目标：4096³ bf16 ≥ 70% cuBLAS。</li>
+    <li><b>FlashAttention 前向。</b>实现 online softmax + 分块 + causal 跳过；对比 <code>F.scaled_dot_product_attention</code>，目标 ≤ 1.3× FA2。分析寄存器压力与 shared memory 用量。</li>
+    <li><b>FlashAttention 反向。</b>实现重算 + atomic 或 split 归约；理解为什么反向比前向难。</li>
+    <li><b>Paged attention。</b>实现带 block table 的 decode kernel，对比连续 KV 的带宽差异。</li>
+    <li><b>CUDA C++ 对照。</b>用 CUDA C++ 写 warp shuffle reduction + 一个 TMA GEMM，理解 Triton 隐藏了什么。</li>
+    <li><b>ncu 深挖。</b>选一个 Inductor 生成的 kernel，用 counters 写出「瓶颈 + 证据 + 改进方案」三段式报告。</li>
+  </ol>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p3-1">能对任意 kernel 先算出 roofline 上界，再实测并解释差距</li>
+      <li><input type="checkbox" data-k="p3-2">GEMM 达到 ≥ 70% cuBLAS（4096³ bf16）</li>
+      <li><input type="checkbox" data-k="p3-3">FA 前向 ≤ 1.3× FA2，且能说出还差在哪（寄存器/occupancy/访存）</li>
+      <li><input type="checkbox" data-k="p3-4">能用 ncu 的 warp stall 分类定位到具体原因（如 long scoreboard / barrier / MIO throttle）</li>
+      <li><input type="checkbox" data-k="p3-5">能解释 TMA 与 <code>cp.async</code> 的差异，以及什么时候值得用 cluster</li>
+      <li><input type="checkbox" data-k="p3-6">能说清 FP8 训练中 scaling 策略与精度损失的权衡</li>
+      <li><input type="checkbox" data-k="p3-7">写出一份可复现的 kernel benchmark 报告（含硬件、版本、命令、数字）</li>
+    </ul>
+  </div>
+
+  <details><summary>常见误区</summary>
+    <p class="mini">
+      ① 不看 roofline 就开始调 tile size——先确认是 memory-bound 还是 compute-bound。<br>
+      ② 以为 occupancy 越高越好——寄存器密集型 kernel 需要低 occupancy 换寄存器复用。<br>
+      ③ 用 <code>torch.cuda.synchronize()</code> 计时——测到的是同步开销，必须用 CUDA events 或 <code>do_bench</code>。<br>
+      ④ 只测一次——必须 flush L2、取 median、报告方差。<br>
+      ⑤ 在 T4/4090 上调 Hopper 特性——硬件不支持，结论不可迁移。
+    </p>
+  </details>
+</section>
+
+<h2 id="p4">阶段 4 · 分布式训练（6 周）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum g">04</span><h3>集合通信 → DDP → FSDP2 → TP/PP</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>6 周 · 90h</span></div>
+    <div><b>前置</b><span>阶段 1；阶段 2 有帮助</span></div>
+    <div><b>产出</b><span>1B 模型 8 卡训练 + 故障演练记录</span></div>
+  </div>
+  <p class="goal">能算清每张卡的显存与通信量，能设计并行方案并论证，能在 hang / 数值不一致 / 扩展性劣化时快速定位。</p>
+
+  <h4>4.1 通信基础</h4>
+  <ul>
+    <li><b>集合操作</b>：broadcast、all-reduce、reduce-scatter、all-gather、all-to-all、send/recv。ring 与 tree 的带宽/延迟特性不同。</li>
+    <li><b>ring all-reduce 通信量</b>：每卡约 <code>2(N-1)/N × S</code> 字节（S 为梯度总字节）。这是判断「通信是否是瓶颈」的第一公式。</li>
+    <li><b>NCCL</b>：拓扑探测（NVLink / PCIe / IB）、<code>NCCL_ALGO</code>、<code>NCCL_PROTO</code>、channel 数、<code>NCCL_DEBUG=INFO</code>、<code>NCCL_DUMP_ON_TIMEOUT</code> + FlightRecorder。</li>
+    <li><b>torch.distributed</b>：<code>ProcessGroup</code>、<code>Work</code>、backend 选择（nccl/gloo）、<code>init_process_group</code> 的 rendezvous。</li>
+  </ul>
+
+  <h4>4.2 数据并行</h4>
+  <ul>
+    <li><b>DDP</b>：反向时按 bucket 触发 all-reduce，bucket 越大通信越高效但越晚开始；<code>bucket_cap_mb</code>、<code>gradient_as_bucket_view</code>、<code>find_unused_parameters</code>、<code>static_graph</code>、<code>no_sync</code>。</li>
+    <li><b>重叠</b>：all-reduce 与反向计算重叠的前提是「bucket 内梯度已就绪」。bucket 边界与参数注册顺序直接决定重叠率。</li>
+    <li><b>通信压缩</b>：fp16 压缩、PowerSGD、梯度累积换通信频率。</li>
+  </ul>
+
+  <h4>4.3 分片与张量并行</h4>
+  <ul>
+    <li><b>DTensor</b>：<code>Placement</code> = Shard(dim) / Replicate / Partial；算子按 placement 传播规则自动重分布。这是 FSDP2 与 TP 的共同底座。</li>
+    <li><b>DeviceMesh</b>：多维设备网格，把 DP/TP/PP 维度显式化。<code>init_device_mesh("cuda", (dp, tp))</code>。</li>
+    <li><b>FSDP2</b>：按参数（不是 FlatParameter）在 dim 0 分片；forward 前 all-gather、backward 后 reduce-scatter；<code>reshard_after_forward</code> 控制显存/通信权衡；HSDP 再做一层复制。</li>
+    <li><b>TP</b>：<code>ColwiseParallel</code> / <code>RowwiseParallel</code> / <code>SequenceParallel</code>；每层两次 all-reduce（或 reduce-scatter + all-gather）；通信量大，适合 NVLink 域内。</li>
+    <li><b>PP</b>：<code>ScheduleGPipe</code>、<code>Schedule1F1B</code>、<code>ScheduleInterleaved1F1B</code>、零气泡调度；micro-batch 数与 bubble 的关系。</li>
+    <li><b>CP / EP</b>：序列维切分（ring attention）、MoE 的 all-to-all 专家并行。</li>
+  </ul>
+
+  <h4>4.4 工程细节</h4>
+  <ul>
+    <li><b>混合精度</b>：bf16 参数 + fp32 master weights + fp32 优化器状态；fp16 需要 GradScaler；loss scaling 与溢出检测。</li>
+    <li><b>显存账本</b>：参数 / 梯度 / 优化器状态 / 激活 / 临时 buffer / 通信 buffer，逐项算。7B + AdamW 不切分约 112GB，这是所有方案的起点。</li>
+    <li><b>分布式 checkpoint</b>：<code>torch.distributed.checkpoint</code> 的 <code>save</code>/<code>load</code>、resharding（8 卡存、4 卡读）、异步 staging。</li>
+    <li><b>确定性</b>：<code>torch.use_deterministic_algorithms(True)</code>、<code>CUBLAS_WORKSPACE_CONFIG</code>、<code>NCCL_DETERMINISTIC</code>，以及性能代价。</li>
+    <li><b>故障诊断</b>：<code>TORCH_DISTRIBUTED_DEBUG=DETAIL</code>、<code>py-spy dump</code>、FlightRecorder、NCCL timeout 分层排查。</li>
+  </ul>
+
+  <h4>源码坐标</h4>
+  <table>
+    <tr><th>路径</th><th>看什么</th><th>深度</th></tr>
+    <tr><td><span class="path">torch/csrc/distributed/c10d/reducer.cpp</span></td><td>DDP bucket、梯度就绪判定、all-reduce 触发</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp</span></td><td>Work 生命周期、watchdog、FlightRecorder</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/device_mesh.py</span></td><td>DeviceMesh 与子网格</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/_tensor/</span></td><td>DTensor 的 dispatch 与 placement 传播</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/fsdp/_fully_shard/_fsdp_param.py</span></td><td>参数分片、all-gather、reshard 状态机</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/fsdp/_fully_shard/_fsdp_collectives.py</span></td><td>通信与计算重叠的实现</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/_composable/fsdp/fully_shard.py</span></td><td>API 与状态管理</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/tensor/parallel/style.py</span></td><td>Colwise/Rowwise/Sequence 的切分规则</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/pipelining/schedules.py</span></td><td>1F1B / interleaved / zero-bubble</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/_functional_collectives.py</span></td><td>可被编译器优化的集合通信（async TP 基础）</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/distributed/checkpoint/</span></td><td>DCP 的 save/load 与 reshard</td><td><span class="tag opt">按需</span></td></tr>
+  </table>
+
+  <h4>Lab</h4>
+  <ol class="labs">
+    <li><b>显存账本。</b>对 1B / 7B / 70B 各算一遍：bf16 参数、梯度、AdamW 状态、激活（给公式）、通信 bucket。先算再实测，误差 &lt; 10%。</li>
+    <li><b>DDP 调参。</b>改 <code>bucket_cap_mb</code>、<code>gradient_as_bucket_view</code>、<code>static_graph</code>，用 nsys 看 all-reduce 与 backward 的重叠率，画出「bucket 大小 vs 吞吐」曲线。</li>
+    <li><b>FSDP2 训练 1B。</b>8 卡训练，测吞吐与显存；对比 <code>reshard_after_forward=True/False</code>；测 HSDP。</li>
+    <li><b>手写 TP。</b>用 DTensor 手动切一个 transformer block（列并行 + 行并行 + sequence parallel），与单卡数值对齐（误差 &lt; 1e-3）。</li>
+    <li><b>PP 调度。</b>用 <code>pipeline</code> API 跑 interleaved 1F1B，改变 micro-batch 数，量化 bubble 比例；解释与理论公式的差异。</li>
+    <li><b>通信/计算重叠。</b>用 <code>_functional_collectives</code> 或 CUDA stream 手写重叠，测端到端提升；用 nsys 证明重叠确实发生。</li>
+    <li><b>故障演练。</b>人为制造 NCCL hang（如某 rank 不参与集合通信），用 FlightRecorder / py-spy / <code>NCCL_DEBUG</code> 定位；再制造一次梯度不一致，用 <code>TORCH_DISTRIBUTED_DEBUG=DETAIL</code> 找到未使用参数。</li>
+    <li><b>Checkpoint reshard。</b>8 卡保存、4 卡加载，验证 DCP 的 reshard 能力。</li>
+  </ol>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p4-1">能闭卷推导 ring all-reduce 通信量，并用它判断某配置下通信是否瓶颈</li>
+      <li><input type="checkbox" data-k="p4-2">能给出 70B 模型在 64 卡上的 3D 并行方案，并说明每层通信模式</li>
+      <li><input type="checkbox" data-k="p4-3">能独立诊断 NCCL hang，说出排查顺序与每步证据</li>
+      <li><input type="checkbox" data-k="p4-4">FSDP2 + TP 组合跑通，且显存/吞吐与预测误差 &lt; 15%</li>
+      <li><input type="checkbox" data-k="p4-5">能手写 TP 并保证数值正确</li>
+      <li><input type="checkbox" data-k="p4-6">能解释 <code>reshard_after_forward</code> 的显存/通信权衡，并给出选择依据</li>
+      <li><input type="checkbox" data-k="p4-7">完成一次 checkpoint reshard 与一次弹性重启</li>
+    </ul>
+  </div>
+
+  <details><summary>常见误区</summary>
+    <p class="mini">
+      ① 一上来就上 TP——TP 通信量大，单机 NVLink 之外性价比很低；先 DP/FSDP。<br>
+      ② 以为 FSDP 一定省显存——<code>reshard_after_forward=False</code> 时激活和参数峰值可能反而更高。<br>
+      ③ 把 NCCL hang 当随机问题重启——必须拿 FlightRecorder / stack dump。<br>
+      ④ 忽略 bucket 与参数注册顺序——重叠率可能差 2 倍。<br>
+      ⑤ 用 <code>find_unused_parameters=True</code> 掩盖模型问题——它会显著拖慢并引入额外同步。
+    </p>
+  </details>
+</section>
+
+<h2 id="p5">阶段 5 · 推理系统（6 周）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum a">05</span><h3>从 KV cache 数学到 serving engine</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>6 周 · 90h</span></div>
+    <div><b>前置</b><span>阶段 3；阶段 4 的 TP 部分</span></div>
+    <div><b>产出</b><span>mini serving engine + SLO 报告</span></div>
+  </div>
+  <p class="goal">能对一个 LLM 服务做容量规划：给定模型、SLO、硬件，算出需要几张卡、多少 batch、瓶颈在哪。</p>
+
+  <h4>5.1 第一性原理</h4>
+  <ul>
+    <li><b>两阶段</b>：prefill 是 compute-bound（大矩阵乘），decode 是 memory-bound（每步只算 1 个 token，但要读全部权重 + KV）。</li>
+    <li><b>KV cache 公式</b>：<code>2 × layers × kv_heads × head_dim × seq_len × batch × dtype_bytes</code>。例：Llama-3-70B（80 层、8 KV heads、128 dim、8192 ctx、batch 32、fp16）≈ <b>86 GB</b>。这个数字决定了一切。</li>
+    <li><b>decode 延迟下界</b>：每步需读 <code>权重 + KV</code> 字节，除以 HBM 带宽。70B bf16 权重 140GB，H100 3.35TB/s → 单步理论 &gt; 42ms（不含 KV）。这就是为什么 decode 必须靠 batch 摊薄。</li>
+    <li><b>指标</b>：TTFT（首 token 延迟）、TPOT/ITL（token 间延迟）、吞吐（tokens/s）、goodput（满足 SLO 的吞吐）。优化目标不同，方案完全不同。</li>
+  </ul>
+
+  <h4>5.2 关键技术</h4>
+  <ul>
+    <li><b>PagedAttention</b>：KV 按 block 管理，block table 做逻辑→物理映射；消除碎片、支持共享前缀、支持按需增长。</li>
+    <li><b>Continuous batching</b>：以 iteration 为调度单位，请求完成即退出、新请求即加入；配合 chunked prefill 避免长 prefill 阻塞 decode。</li>
+    <li><b>Prefix caching</b>：按 block hash 复用相同前缀的 KV，对多轮对话/系统提示收益巨大。</li>
+    <li><b>Attention 后端</b>：FlashAttention / FlashInfer / cuDNN / TRT-LLM / <code>flex_attention</code>；不同后端在不同 seq/batch 下差异明显，必须实测。</li>
+    <li><b>投机解码</b>：draft model / Medusa / EAGLE / MTP / n-gram；加速比 ≈ <code>(1 + α·k) / (1 + c)</code>，α 是接受率、k 是草稿长度、c 是草稿成本。接受率是命门。</li>
+    <li><b>量化</b>：W8A8、W4A16、FP8（per-tensor / per-channel / per-block）、MXFP4/NVFP4；<code>torchao</code>、<code>torch._scaled_mm</code>。必须同时测精度与延迟。</li>
+    <li><b>并行</b>：TP（每层 all-reduce）、EP（MoE all-to-all）、DP 副本；P/D 分离（prefill 与 decode 分池，KV 通过 NIXL/Mooncake 传输）以独立扩缩容。</li>
+    <li><b>调度</b>：优先级、SLO 感知、chunked prefill 的 chunk 大小、max_num_seqs、max_num_batched_tokens。</li>
+    <li><b>执行优化</b>：CUDA graph（decode 形状固定，收益极大）、<code>torch.compile</code>、AOTI、piecewise CUDA graph。</li>
+  </ul>
+
+  <h4>源码 / 论文坐标</h4>
+  <table>
+    <tr><th>来源</th><th>看什么</th><th>深度</th></tr>
+    <tr><td>vLLM <code>vllm/v1/</code></td><td>scheduler、block manager、model runner、attention backend</td><td><span class="tag must">必读</span></td></tr>
+    <tr><td>SGLang <code>python/sglang/srt/</code></td><td>RadixAttention、前缀树、调度</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/nn/attention/flex_attention.py</span></td><td>block mask 与 score mod 的表达能力</td><td><span class="tag core">精读</span></td></tr>
+    <tr><td><span class="path">torch/_inductor/kernel/flex/flex_attention.py</span></td><td>生成侧实现</td><td><span class="tag opt">按需</span></td></tr>
+    <tr><td>PagedAttention / Orca / Sarathi-Serve / Mooncake 论文</td><td>问题定义与关键洞察</td><td><span class="tag must">必读</span></td></tr>
+  </table>
+
+  <h4>Lab</h4>
+  <ol class="labs">
+    <li><b>KV 容量计算器。</b>写一个脚本：输入模型配置、batch、seq、dtype、TP 度，输出每卡 KV 显存与最大并发。用 vLLM 实测校准。</li>
+    <li><b>mini serving engine。</b>实现：paged KV（block 分配/回收）、continuous batching、chunked prefill、CUDA graph decode。目标：Llama-3-8B 上达到 vLLM 70% 吞吐。</li>
+    <li><b>FlashDecoding。</b>实现 split-KV 的 decode attention，测长上下文下的收益。</li>
+    <li><b>投机解码。</b>接一个小 draft model，测不同 k 与温度下的接受率与端到端加速；画 α vs speedup 曲线。</li>
+    <li><b>量化对比。</b>同一模型跑 bf16 / FP8 / INT4，测 TTFT、TPOT、吞吐、困惑度/任务准确率，给出取舍建议。</li>
+    <li><b>SLO 调优。</b>给定 TTFT &lt; 500ms、TPOT &lt; 50ms，调 <code>max_num_seqs</code>、chunk size、TP 度，找到满足 SLO 的最大 goodput。</li>
+    <li><b>横向对比。</b>vLLM vs SGLang vs TRT-LLM，同一硬件同一模型，解释差异来源（调度、kernel、量化、graph）。</li>
+  </ol>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p5-1">能现场推导任意模型的 KV 显存与 decode 延迟下界</li>
+      <li><input type="checkbox" data-k="p5-2">mini engine 达到 vLLM 70% 吞吐，且代码能解释每个设计选择</li>
+      <li><input type="checkbox" data-k="p5-3">能说清 PagedAttention 相比连续分配的三个具体收益</li>
+      <li><input type="checkbox" data-k="p5-4">能给出投机解码的加速比公式并解释 α 的影响因素</li>
+      <li><input type="checkbox" data-k="p5-5">能对 FP8/INT4 给出精度-性能权衡结论（带数字）</li>
+      <li><input type="checkbox" data-k="p5-6">能为一个给定 SLO 做容量规划（卡数、TP 度、batch、瓶颈）</li>
+      <li><input type="checkbox" data-k="p5-7">能用 profiler 区分 TTFT 与 TPOT 的瓶颈并分别优化</li>
+    </ul>
+  </div>
+
+  <details><summary>常见误区</summary>
+    <p class="mini">
+      ① 只看吞吐不看 goodput——高吞吐但违反 SLO 的服务没有意义。<br>
+      ② 以为 batch 越大越好——KV 显存与 TPOT 会先崩。<br>
+      ③ 忽略 prefill 对 decode 的干扰——chunked prefill 是必需项。<br>
+      ④ 量化只看速度不看精度——很多任务在 INT4 下掉点严重。<br>
+      ⑤ 用平均延迟代替 P99——线上 SLO 看尾延迟。
+    </p>
+  </details>
+</section>
+
+<h2 id="p6">阶段 6 · 大规模训练系统（5 周）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum g">06</span><h3>MFU、优化器、容错与集群</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>5 周 · 75h</span></div>
+    <div><b>前置</b><span>阶段 4</span></div>
+    <div><b>产出</b><span>小 LM 端到端训练 + 扩展性曲线</span></div>
+  </div>
+  <p class="goal">从「能跑通分布式」升级到「能对一次真实训练负责」：性能、稳定性、成本、可恢复性。</p>
+
+  <h4>核心概念</h4>
+  <ul>
+    <li><b>MFU</b>：<code>6 × N × D / (t × peak_FLOPs)</code>。H100 bf16 稠密峰值约 990 TFLOPS（SXM，含 sparsity 翻倍）。好的训练 MFU 在 35–55%。MFU 是唯一能横向比较训练系统的指标。</li>
+    <li><b>Scaling law</b>：Chinchilla 的 compute-optimal 配比；muP 用于超参迁移；这些决定「给定算力该训多大模型、多少 token」。</li>
+    <li><b>优化器显存</b>：AdamW 每参数 4（fp32 master）+ 4（m）+ 4（v）+ 2（bf16 param）+ 2（bf16 grad）= 16 bytes；Muon / 8-bit optimizer 可显著降低。</li>
+    <li><b>激活重计算</b>：全量 checkpoint 约省 <code>O(√L)</code> 显存、多 33% 计算；选择性 checkpoint 只对 attention 部分重算，性价比最高。</li>
+    <li><b>数据管线</b>：tokenizer、packing（避免 padding 浪费）、去重、流式读取、多 worker 预取、样本级 shuffle buffer。数据瓶颈常被误判为 GPU 瓶颈。</li>
+    <li><b>容错</b>：<code>torchrun --max-restarts</code>、周期性 checkpoint、异步 checkpoint、straggler 检测、节点健康检查。</li>
+    <li><b>集群</b>：NVLink 域（8 卡）→ IB  rail-optimized 拓扑 → GPUDirect RDMA；NCCL 拓扑探测；gang scheduling；拓扑感知放置。</li>
+    <li><b>稳定性</b>：loss spike 的常见原因（LR 过大、bf16 溢出、数据脏、通信不同步、优化器状态异常）；如何用 grad norm、activation norm 定位。</li>
+  </ul>
+
+  <h4>Lab</h4>
+  <ol class="labs">
+    <li><b>端到端训练。</b>从零训练一个 125M–1B 的 decoder LM（自己的 tokenizer + 数据管线），记录 loss 曲线、tokens/s/GPU、MFU。</li>
+    <li><b>扩展性曲线。</b>1 → 2 → 4 → 8 卡，画吞吐与 scaling efficiency；解释每段下降的原因（通信、数据、bubble）。</li>
+    <li><b>重计算策略。</b>对比 none / selective / full 的显存与吞吐，给出最优选择及理由。</li>
+    <li><b>优化器对比。</b>AdamW vs 8-bit vs Muon，在相同 token 预算下比较 loss 与显存。</li>
+    <li><b>故障注入。</b>训练中 kill 一个 rank，验证弹性重启 + checkpoint 恢复，测恢复时间与丢失步数。</li>
+    <li><b>loss spike 诊断。</b>人为制造一次（调大 LR / 注入异常数据），用 grad norm、per-layer norm、数据回放定位。</li>
+    <li><b>成本分析。</b>给定预算与目标 loss，估算所需 GPU-hours 与最优模型规模。</li>
+  </ol>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p6-1">能计算并解释自己训练的 MFU，指出损失在哪（通信/重算/数据/bubble）</li>
+      <li><input type="checkbox" data-k="p6-2">能画出扩展性曲线并解释每段效率下降</li>
+      <li><input type="checkbox" data-k="p6-3">能给出 70B 训练的完整显存与通信预算表</li>
+      <li><input type="checkbox" data-k="p6-4">能独立诊断一次 loss spike 并给出修复</li>
+      <li><input type="checkbox" data-k="p6-5">弹性重启恢复时间 &lt; 5 分钟，且不丢 checkpoint 之后的语义</li>
+      <li><input type="checkbox" data-k="p6-6">能对给定预算做模型规模/训练 token 的最优规划</li>
+    </ul>
+  </div>
+</section>
+
+<h2 id="p7">阶段 7 · 上游贡献（全程穿插）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum v">07</span><h3>把理解变成可验证的影响力</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>全程 · 2h/周</span></div>
+    <div><b>前置</b><span>阶段 1 结束后即可开始</span></div>
+    <div><b>产出</b><span>≥ 10 merged PR + 1 design doc</span></div>
+  </div>
+  <p class="goal">面试官不看你「读过」，只看你「改过、论证过、被 review 过」。上游贡献是能力的最强证据。</p>
+
+  <div class="callout bad">
+    <b class="t">仓库硬性规则（AI_POLICY.md）</b>
+    任何 issue / PR / 评论都必须由你本人审阅并明确同意后才能提交；AI 生成内容必须标注在 “Agent details” 或引用块中；
+    提交前必须查重（<code>gh search issues/prs</code>）；未就绪的 PR 一律 draft；必须使用模板。
+    <b>禁止全自动生成贡献。</b>本路线中的贡献环节全部要求你亲自理解并改写。
+  </div>
+
+  <h4>路径</h4>
+  <ol class="labs">
+    <li><b>先做「可验证的小事」</b>：文档错误、缺失的类型标注、测试覆盖、小的 decomposition、性能微优化。目标是熟悉流程，不是炫技。</li>
+    <li><b>从自己的 lab 反哺</b>：你在阶段 2/3 写的 lowering、template、bug fix，很多都能变成 upstream PR。</li>
+    <li><b>接 issue</b>：按标签找 <code>module: inductor</code>、<code>module: dynamo</code>、<code>module: distributed</code>、<code>triaged</code> 的 bug；先复现、再定位、再修。</li>
+    <li><b>写 design doc</b>：选一个你熟悉的子系统，写清问题、方案、备选方案、权衡、迁移路径。发到 dev-discuss 或作为 PR 描述。</li>
+    <li><b>做 review</b>：开始 review 别人的 PR，练习指出 BC 风险、测试缺口、性能隐患。</li>
+  </ol>
+
+  <h4>必须掌握的流程</h4>
+  <table>
+    <tr><th>环节</th><th>要点</th></tr>
+    <tr><td>复现</td><td>最小可复现脚本；记录 commit、硬件、环境；先写失败测试</td></tr>
+    <tr><td>定位</td><td>二分（git bisect）、日志、profiler、最小化修改</td></tr>
+    <tr><td>修复</td><td>最小改动、匹配现有风格、补测试、考虑 BC</td></tr>
+    <tr><td>提交</td><td><code>lintrunner -a</code>；commit message 写根因、方案、Test Plan（含实际命令）</td></tr>
+    <tr><td>CI</td><td><code>gh pr checks &lt;PR&gt;</code>；读 pytorch-bot 首条评论；<code>[no-ci]</code> 节省资源</td></tr>
+    <tr><td>review</td><td>回应每条意见；必要时拆分 PR；保持 diff 小</td></tr>
+  </table>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p7-1">≥ 10 个 merged PR，覆盖 ≥ 2 个子系统（如 inductor + distributed）</li>
+      <li><input type="checkbox" data-k="p7-2">至少 1 个 PR 包含性能改进并附 benchmark 数字</li>
+      <li><input type="checkbox" data-k="p7-3">至少 1 篇 design doc 或 RFC</li>
+      <li><input type="checkbox" data-k="p7-4">完成 ≥ 10 次有实质内容的 code review</li>
+      <li><input type="checkbox" data-k="p7-5">能独立走完「复现 → 修复 → CI → merge」全流程</li>
+    </ul>
+  </div>
+</section>
+
+<h2 id="p8">阶段 8 · 面试与能力验证（3 周）</h2>
+<section class="phase">
+  <div class="ph-head"><span class="pnum a">08</span><h3>把知识变成可表达、可验证的能力</h3><span class="pcount" data-count></span></div>
+  <div class="kv">
+    <div><b>周期</b><span>3 周 · 30h</span></div>
+    <div><b>前置</b><span>阶段 1–6</span></div>
+    <div><b>产出</b><span>系统设计稿 + mock 记录</span></div>
+  </div>
+
+  <h4>面试形态（AI Infra / ML Systems）</h4>
+  <table>
+    <tr><th>类型</th><th>典型题</th><th>考察点</th></tr>
+    <tr><td>系统设计</td><td>设计一个 100B 模型在 512 卡上的训练系统；设计支持 1M 并发的推理服务；设计一个多租户 GPU 调度器</td><td>显存/通信/容错/SLO/成本的全链路权衡</td></tr>
+    <tr><td>性能推理</td><td>这个 kernel 能跑多快？为什么慢？如何优化？</td><td>roofline、计数器、第一性原理</td></tr>
+    <tr><td>代码阅读</td><td>读一段 PyTorch/Inductor/vLLM 代码，指出问题或解释行为</td><td>源码熟悉度、边界条件</td></tr>
+    <tr><td>调试</td><td>训练 loss 异常 / 分布式 hang / 推理延迟抖动</td><td>排查方法论、证据链</td></tr>
+    <tr><td>项目深挖</td><td>讲一个你做过的优化，追问到细节</td><td>真实性、深度、影响力</td></tr>
+    <tr><td>编码</td><td>手写 attention / 并行 prefix sum / 简单调度器</td><td>工程基本功</td></tr>
+  </table>
+
+  <h4>准备方法</h4>
+  <ol class="labs">
+    <li><b>写 3 份系统设计稿</b>（训练 / 推理 / 调度），每份包含：需求、约束、方案、备选、容量计算、失败模式。</li>
+    <li><b>做 5 次 mock</b>：找同学/同事，或自录自评。重点练「先澄清需求 → 给框架 → 深入细节 → 总结权衡」。</li>
+    <li><b>把 lab 变成故事</b>：每个项目准备 3 分钟版本 + 15 分钟版本，包含数字、根因、取舍、影响。</li>
+    <li><b>过完 <a href="#quiz">自测题库</a></b>，答不上的回到对应阶段。</li>
+  </ol>
+
+  <div class="accept"><b>验收标准</b>
+    <ul class="check">
+      <li><input type="checkbox" data-k="p8-1">3 份系统设计稿，每份能在 45 分钟内白板讲完</li>
+      <li><input type="checkbox" data-k="p8-2">5 次 mock，且每次都有明确改进项</li>
+      <li><input type="checkbox" data-k="p8-3">题库 30 题全部能给出「结论 + 推导 + 边界条件」</li>
+      <li><input type="checkbox" data-k="p8-4">能对任意一个自己做过的优化，回答 5 层追问</li>
+    </ul>
+  </div>
+</section>
+
+<h2 id="projects">北极星项目</h2>
+<p>这四个项目是「能力的压缩包」。完成任意两个，就足以支撑 senior 级别的项目深挖；完成四个，属于明显高于门槛。</p>
+<table>
+  <tr><th>项目</th><th>内容</th><th>对应阶段</th><th>难度</th><th>验收</th></tr>
+  <tr>
+    <td><b>mini-torch</b></td>
+    <td>用 Python/C++ 实现一个微型框架：Tensor、strided view、dispatcher、autograd、10 个算子</td>
+    <td>1</td><td>中</td>
+    <td>能训练一个 MLP，且梯度与 PyTorch 对齐</td>
+  </tr>
+  <tr>
+    <td><b>mini-inductor</b></td>
+    <td>对 FX 图做融合 + 生成 Triton，覆盖 pointwise/reduction/matmul</td>
+    <td>2–3</td><td>高</td>
+    <td>在 3 个模型上达到 <code>torch.compile</code> 的 60% 性能</td>
+  </tr>
+  <tr>
+    <td><b>mini-vLLM</b></td>
+    <td>paged KV + continuous batching + chunked prefill + CUDA graph</td>
+    <td>5</td><td>高</td>
+    <td>7B 模型达到 vLLM 70% 吞吐</td>
+  </tr>
+  <tr>
+    <td><b>1B 训练复现</b></td>
+    <td>从数据到 checkpoint 的完整训练，含 FSDP2 + TP、容错、MFU 报告</td>
+    <td>4–6</td><td>高</td>
+    <td>MFU ≥ 35%，弹性恢复 &lt; 5 分钟</td>
+  </tr>
+</table>
+
+<h2 id="cadence">每周节奏</h2>
+<table>
+  <tr><th>时间</th><th>内容</th><th>产出</th></tr>
+  <tr><td>周一 2h</td><td>读源码 / 论文（带着 3 个问题读）</td><td>3 条笔记，写明「验证方式」</td></tr>
+  <tr><td>周二–周四 各 2h</td><td>Lab：写代码、跑 benchmark、profile</td><td>可运行脚本 + 数字</td></tr>
+  <tr><td>周五 1.5h</td><td>整理实验记录，写清「结论 / 证据 / 下一步」</td><td>一段可复用的总结</td></tr>
+  <tr><td>周末 5–6h</td><td>北极星项目 / 上游 PR</td><td>可演示的进展</td></tr>
+</table>
+<div class="callout tip">
+  <b class="t">每两周一次「盲测」</b>
+  挑一个你没做过的性能问题（自己的或开源的），限时 60 分钟，只允许用 profiler 和源码，不许搜索。
+  记录：你花了多久定位、假设错在哪。这是最接近真实工作的训练。
+</div>
+
+<h2 id="debug">性能诊断清单</h2>
+<p>遇到「变慢了」时按顺序过，每一步都要有数字。</p>
+<table>
+  <tr><th>层</th><th>检查项</th><th>工具 / 命令</th></tr>
+  <tr><td>基线</td><td>是否同一 commit、驱动、CUDA、NCCL、输入分布？</td><td>记录表</td></tr>
+  <tr><td>数据</td><td>dataloader 是否成为瓶颈？packing 是否退化？</td><td>nsys、CPU 利用率、<code>torch.profiler</code></td></tr>
+  <tr><td>Python</td><td>是否频繁 graph break / recompile？</td><td><code>TORCH_LOGS=graph_breaks,recompiles</code></td></tr>
+  <tr><td>Kernel</td><td>是否退化为非融合 / 非向量化 / 错误 tile？</td><td><code>TORCH_LOGS=+output_code</code>、ncu</td></tr>
+  <tr><td>访存</td><td>是否 memory-bound？L2 命中率、sectors/request</td><td>ncu Memory Workload Analysis</td></tr>
+  <tr><td>Launch</td><td>kernel 太多、launch gap 大？</td><td>nsys、CUDA graph 对比</td></tr>
+  <tr><td>同步</td><td>是否有隐藏的 <code>.item()</code> / <code>cuda.synchronize</code> / 动态 shape</td><td>nsys 时间线、<code>torch.cuda.set_sync_debug_mode</code></td></tr>
+  <tr><td>通信</td><td>all-reduce 是否与计算重叠？bucket 是否合理？</td><td>nsys、<code>NCCL_DEBUG=INFO</code></td></tr>
+  <tr><td>显存</td><td>是否触发 allocator 抖动 / OOM 回退？</td><td><code>torch.cuda.memory_summary()</code>、<code>expandable_segments</code></td></tr>
+  <tr><td>数值</td><td>是否因精度回退导致重算或重试？</td><td>loss 曲线、grad norm</td></tr>
+</table>
+<div class="callout warn">
+  <b class="t">最常见的假优化</b>
+  改了代码、数字变好，但其实是缓存命中 / 输入变简单 / 没 flush L2 / 只测了一次。
+  任何优化结论必须满足：同输入、同环境、多次取中位数、报告方差。
+</div>
+
+<h2 id="res">资源库</h2>
+
+<h3>必读（按阶段）</h3>
+<table>
+  <tr><th>阶段</th><th>资源</th><th>说明</th></tr>
+  <tr><td>1</td><td>ezyang, <i>PyTorch Internals</i></td><td>Tensor / Storage / dispatcher 的最佳入门，读三遍</td></tr>
+  <tr><td>1</td><td>PyTorch 官方 <i>Contributing</i> 与 <code>torch/_library</code> 文档</td><td>算子注册的现代方式</td></tr>
+  <tr><td>2</td><td><i>PyTorch 2: Faster Machine Learning Through Dynamic Python Bytecode Transformation and Graph Compilation</i> (ASPLOS'24)</td><td>Dynamo/Inductor 设计动机</td></tr>
+  <tr><td>2</td><td>ezyang, <i>Let's chat about torch.compile</i> 系列</td><td>编译栈边界与设计权衡</td></tr>
+  <tr><td>2</td><td>Horace He 的博客 / <code>dev-discuss</code> 帖子</td><td>Inductor 设计的一手材料</td></tr>
+  <tr><td>3</td><td>CUDA C++ Programming Guide + Hopper Tuning Guide</td><td>硬件模型权威</td></tr>
+  <tr><td>3</td><td>Triton 官方 tutorials + <i>Triton: An Intermediate Language...</i></td><td>从 vector add 到 FA</td></tr>
+  <tr><td>3</td><td>FlashAttention 1/2/3 论文</td><td>online softmax 与 IO 感知</td></tr>
+  <tr><td>3</td><td>CUTLASS / CuTe 文档</td><td>GEMM 工程实践</td></tr>
+  <tr><td>3</td><td>GPU MODE 课程录像</td><td>kernel 工程系统训练</td></tr>
+  <tr><td>4</td><td>ZeRO、FSDP、Megatron-LM、GPipe、PipeDream 论文</td><td>并行策略原始出处</td></tr>
+  <tr><td>4</td><td>NCCL 文档 + <code>torch/distributed/AGENTS.md</code></td><td>通信语义与本仓库约定</td></tr>
+  <tr><td>5</td><td>PagedAttention (vLLM)、Orca、Sarathi-Serve、Mooncake</td><td>推理系统主线</td></tr>
+  <tr><td>5</td><td>SGLang / FlashInfer 文档</td><td>调度与 attention 后端</td></tr>
+  <tr><td>6</td><td><i>How to Scale Your Model</i>（Google DeepMind scaling book）</td><td>训练系统最好的系统化材料</td></tr>
+  <tr><td>6</td><td>Chinchilla、muP 论文</td><td>规模与超参</td></tr>
+  <tr><td>全程</td><td>Stanford CS336 <i>Language Modeling from Scratch</i></td><td>从零实现 LM 全栈，与阶段 5/6 高度互补</td></tr>
+  <tr><td>全程</td><td>CMU 10-414/714 <i>Deep Learning Systems</i></td><td>框架与编译器实现，补阶段 1/2</td></tr>
+</table>
+
+<h3>日常信息源</h3>
+<ul>
+  <li><code>pytorch/pytorch</code> 的 <code>dev-discuss</code> 仓库与 GitHub Discussions</li>
+  <li><code>pytorch.org/blog</code>、<code>pytorch.org/dev-discuss</code></li>
+  <li>vLLM / SGLang / Triton / CUTLASS 的 release notes 与 design docs</li>
+  <li>MLSys / NeurIPS / ICML 的 systems track 论文</li>
+</ul>
+
+<h2 id="quiz">自测题库</h2>
+<p>每题都要能给出「结论 + 推导 + 边界条件」。答不上来，回到对应阶段。</p>
+
+<details><summary>1. <code>x.t()</code> 为什么不产生 kernel？<code>y = x.t() + 1</code> 会产生几个 kernel？</summary>
+  <p class="a"><b>结论：</b><code>t()</code> 只改 stride 元数据，零拷贝、零 kernel。<code>y</code> 通常 1 个 kernel（Inductor 可把转置融合进 pointwise 的索引表达式），eager 下也是 1 个 kernel。<br>
+  <b>推导：</b>TensorImpl 的 sizes/strides 是可变量；<code>t()</code> 返回新 TensorImpl 共享 Storage。<code>+1</code> 是 pointwise，逐元素读写，访存量 2×N×dtype。若下游需要连续内存（如 GEMM 输入），才会插入 copy kernel。<br>
+  <b>边界：</b>若后端不支持非连续访存（某些 kernel 要求 contiguous），会隐式 <code>contiguous()</code>，这时才是 2 个 kernel。</p>
+</details>
+
+<details><summary>2. 为什么 <code>torch.compile</code> 在 batch size 变化时会重新编译？</summary>
+  <p class="a"><b>结论：</b>Dynamo 默认对 int 参数做特化并生成守卫，形状变化导致守卫失败，触发 recompile；开启 <code>automatic_dynamic_shapes</code> 后第二次不同 shape 会把该维转为 SymInt。<br>
+  <b>推导：</b>guard 绑定具体值或 SymInt 的约束；<code>cache_size_limit</code> 限制单码对象的缓存条目。<br>
+  <b>边界：</b>动态 shape 会增加守卫和 kernel 分支，短序列/小 batch 场景可能反而更慢；用 <code>mark_dynamic</code> + <code>Dim</code> 约束可减少分支。</p>
+</details>
+
+<details><summary>3. 列举 5 种常见 graph break 原因。</summary>
+  <p class="a">① 数据依赖的控制流（<code>if x.sum() &gt; 0</code>）；② 调用未支持的第三方库 / C 扩展；③ <code>.item()</code>、<code>.data_ptr()</code> 等需要具体值的操作；④ 动态创建的 Python 对象 / 副作用；⑤ 不支持的自定义 autograd.Function；⑥ 张量作为 dict key / 依赖 <code>id()</code>。（答 5 个即可）</p>
+</details>
+
+<details><summary>4. 为什么编译区域内调用 <code>loss.item()</code> 很糟？</summary>
+  <p class="a"><b>结论：</b>它要求 GPU→CPU 同步取值，打断图、强制同步、阻止融合与 CUDA graph。<br>
+  <b>推导：</b><code>.item()</code> 产生 unbacked SymInt / 需要真实数据，Dynamo 只能 graph break；即使不断图，也会插入 sync，破坏异步流水。<br>
+  <b>做法：</b>把 logging 放到图外；必须在图内就用 <code>torch._dynamo.graph_break()</code> 显式隔离，或累积到 device 上定期取。</p>
+</details>
+
+<details><summary>5. 解释 min-cut partitioning，以及为什么反向需要重算。</summary>
+  <p class="a"><b>结论：</b>AOTAutograd 把 forward 与 backward 合成 joint graph，再找一组割点把图切成两半：割点上的张量被保存，其余中间结果在反向时按需重算。<br>
+  <b>为什么重算：</b>保存所有中间激活显存不可承受；重算用计算换显存。<code>min-cut</code> 在「保存字节数」与「重算计算量」之间优化。<br>
+  <b>边界：</b>重算会增加约 33% 计算（全量 checkpoint 的最坏情况），但可通过选择性 checkpoint 降低。</p>
+</details>
+
+<details><summary>6. Functionalize dispatch key 解决什么问题？</summary>
+  <p class="a"><b>结论：</b>把带副作用/别名的 op（<code>add_</code>、<code>copy_</code>、<code>resize_</code>）改写成纯函数式形式（读旧值 + 产生新值 + 写回），使图可以被安全地重排、融合、并行。<br>
+  <b>为什么需要：</b>编译器要求无隐藏状态；分布式要求明确的读写依赖；export 要求纯函数。<br>
+  <b>边界：</b>functionalization 会增加拷贝，Inductor 会在 lowering 阶段再消掉不必要的拷贝。</p>
+</details>
+
+<details><summary>7. 为什么 FakeTensor 跑不了 <code>torch.nonzero</code> 的某些用法？</summary>
+  <p class="a"><b>结论：</b><code>nonzero</code> 的输出形状依赖数据，FakeTensor 没有数据，只能产生 <b>unbacked SymInt</b>；后续若用它做索引/切片，就可能无法求解约束而报错。<br>
+  <b>处理：</b>用 <code>constrain_range</code>、改写算法、或接受 graph break。<br>
+  <b>边界：</b>unbacked SymInt 不是错误，关键是不要让它参与需要具体值的运算。</p>
+</details>
+
+<details><summary>8. Inductor 如何决定两个 op 是否融合？</summary>
+  <p class="a"><b>结论：</b>看它们能否在同一个 loop nest 内完成，且不增加重复计算或破坏依赖；同时考虑 realize（是否必须物化）、内存复用、以及 reduction/scan 的不可融合性。<br>
+  <b>证据：</b><code>SchedulerNode</code> 的依赖边、<code>why_fused</code> 日志、生成的 kernel 数。<br>
+  <b>边界：</b>融合不是越多越好：过度融合会增加寄存器压力、降低 occupancy。</p>
+</details>
+
+<details><summary>9. DDP 的 bucket 大小如何取舍？</summary>
+  <p class="a"><b>结论：</b>bucket 越大，单次 all-reduce 效率越高（摊薄延迟），但开始通信越晚、与反向重叠越少；bucket 越小，重叠越好但通信次数多、延迟占比高。<br>
+  <b>调法：</b>从 25MB 起，用 nsys 看「all-reduce 覆盖反向的比例」，画曲线找拐点。<br>
+  <b>边界：</b><code>gradient_as_bucket_view</code> 可省一次拷贝；<code>static_graph</code> 允许更激进的优化。</p>
+</details>
+
+<details><summary>10. FSDP2 与 FSDP1 的关键区别？</summary>
+  <p class="a"><b>结论：</b>FSDP2 用 DTensor 对<b>每个参数</b>独立分片（dim 0），不再把所有参数压成一个 FlatParameter；因此支持按参数设置不同策略、更好的 TP 组合、更清晰的 state dict、更少的内存峰值。<br>
+  <b>代价：</b>通信次数可能更多，需要 collector 做批处理。<br>
+  <b>边界：</b>小参数很多时，collector 的批处理策略直接影响性能。</p>
+</details>
+
+<details><summary>11. 为什么 FSDP 在 forward 前 all-gather、backward 后 reduce-scatter？</summary>
+  <p class="a"><b>结论：</b>参数按 dim 0 分片存储以省显存；计算需要完整参数，所以 forward 前 all-gather，用完即释放（<code>reshard_after_forward</code>）；反向得到的是完整梯度，需要 reduce-scatter 回分片形式，同时完成梯度同步。<br>
+  <b>显存账本：</b>峰值 ≈ 分片参数 + 当前层的完整参数 + 激活 + 梯度分片。<br>
+  <b>边界：</b><code>reshard_after_forward=False</code> 省一次 all-gather，但显存峰值升高。</p>
+</details>
+
+<details><summary>12. 7B 模型用 AdamW + bf16 混合精度，不切分需要多少显存？</summary>
+  <p class="a"><b>结论：</b>参数 bf16 14GB + 梯度 bf16 14GB + fp32 master 28GB + Adam m/v 56GB ≈ <b>112GB</b>，再加激活。单卡 80GB 放不下。<br>
+  <b>推导：</b>每参数 2+2+4+4+4 = 16 bytes × 7e9。<br>
+  <b>边界：</b>8-bit optimizer 可把 m/v 降到 14GB；ZeRO/FSDP 按卡数分摊。</p>
+</details>
+
+<details><summary>13. 推导 ring all-reduce 的通信量。</summary>
+  <p class="a"><b>结论：</b>每卡发送/接收约 <code>2(N-1)/N × S</code> 字节（reduce-scatter + all-gather 各 <code>(N-1)/N × S</code>）。<br>
+  <b>含义：</b>N 很大时趋近 2S，与卡数基本无关；因此增大规模时通信量不爆炸，但延迟和带宽竞争会。<br>
+  <b>边界：</b>tree 算法在小消息/高延迟网络下更优；NVLink 域内可用更激进的算法。</p>
+</details>
+
+<details><summary>14. TP、PP、DP 分别在什么情况下用？</summary>
+  <p class="a"><b>DP</b>：模型放得下、追求吞吐，通信是梯度 all-reduce，最成熟。<br>
+  <b>TP</b>：单层放不下或需要降延迟，通信是每层 all-reduce，必须高带宽（NVLink 域内）。<br>
+  <b>PP</b>：超大规模、跨节点，通信量小但有 bubble，需要足够 micro-batch。<br>
+  <b>组合原则：</b>TP 放节点内，PP 跨节点，DP 最外层；EP 用于 MoE。</p>
+</details>
+
+<details><summary>15. 为什么 decode 是 memory-bound？给出延迟下界公式。</summary>
+  <p class="a"><b>结论：</b>每生成 1 个 token，需要读取全部权重 + 该请求的 KV cache，但只做 O(1) 的矩阵-向量计算，算术强度极低。<br>
+  <b>下界：</b><code>t ≥ (W_bytes + KV_bytes) / HBM_BW</code>。70B bf16 权重 140GB / 3.35TB/s ≈ 42ms。<br>
+  <b>推论：</b>提高 batch 可摊薄权重读取，但 KV 线性增长；因此需要 PagedAttention、量化、投机解码。</p>
+</details>
+
+<details><summary>16. 算一下 Llama-3-70B、8192 上下文、batch 32、fp16 的 KV cache。</summary>
+  <p class="a"><b>结论：</b>约 <b>86GB</b>。<br>
+  <b>推导：</b>2（K/V）× 80 层 × 8 KV heads × 128 dim = 163,840 元素/token；×8192 = 1.34e9；×32 = 4.29e10 元素；×2 bytes ≈ 85.9GB。<br>
+  <b>边界：</b>GQA 已经把 KV heads 从 64 降到 8；若用 MLA 或 KV 量化还能再降。</p>
+</details>
+
+<details><summary>17. PagedAttention 相比连续 KV 分配的三个收益？</summary>
+  <p class="a">① 消除外部碎片（按 block 分配，浪费 &lt; 1 block/请求）；② 支持前缀共享（block table 指向同一物理块，copy-on-write）；③ 支持按需增长与抢占（可换出/重算），提升并发。<br>
+  <b>代价：</b>间接寻址增加 kernel 复杂度，需要专门的 attention 实现。</p>
+</details>
+
+<details><summary>18. Chunked prefill 解决什么问题？</summary>
+  <p class="a"><b>结论：</b>长 prefill 会独占一个 iteration，导致正在 decode 的请求 TPOT 抖动（尾延迟恶化）。把 prefill 切成小块与 decode 混批，可平滑 TPOT。<br>
+  <b>代价：</b>prefill 的 TTFT 可能变长；chunk 太小会降低 prefill 的算力利用率。<br>
+  <b>调法：</b>按 SLO 调 <code>max_num_batched_tokens</code> 与 chunk 大小。</p>
+</details>
+
+<details><summary>19. 投机解码的加速比公式与关键变量？</summary>
+  <p class="a"><b>结论：</b>理想加速比 ≈ <code>(1 + α·k) / (1 + c)</code>，α 为接受率、k 为草稿长度、c 为草稿相对成本。<br>
+  <b>关键：</b>α 随 k 增大而下降；草稿模型越强 α 越高但 c 越大。存在最优 k。<br>
+  <b>边界：</b>大 batch 下 GPU 已饱和，投机收益下降；低 batch/低延迟场景收益最大。</p>
+</details>
+
+<details><summary>20. FP8 的 e4m3 与 e5m2 分别用在哪？</summary>
+  <p class="a"><b>e4m3</b>：更高精度、更小动态范围，用于前向的权重/激活。<br>
+  <b>e5m2</b>：更大动态范围、更低精度，用于梯度（梯度动态范围大）。<br>
+  <b>scaling：</b>per-tensor 简单但受离群值影响；per-channel/per-block（如 MXFP8 的 32 元素块）更稳。训练常用 delayed scaling + amax 历史。<br>
+  <b>边界：</b>FP8 的精度损失常表现为收敛变慢而非发散，必须看 loss 曲线与下游指标。</p>
+</details>
+
+<details><summary>21. 为什么 <code>torch.cuda.synchronize()</code> 在性能代码里是 bug？</summary>
+  <p class="a"><b>结论：</b>它阻塞 CPU 直到所有 GPU 工作完成，破坏 CPU/GPU 异步流水，使 launch 与计算无法重叠；在计时场景还会把同步开销算进去。<br>
+  <b>正确做法：</b>用 CUDA events 或 <code>do_bench</code> 计时；只在必须读结果时同步。<br>
+  <b>隐蔽来源：</b><code>.item()</code>、<code>print(tensor)</code>、<code>if tensor:</code>、动态 shape 触发的 <code>cudaMemcpy</code>。</p>
+</details>
+
+<details><summary>22. CUDA graph 的捕获约束有哪些？</summary>
+  <p class="a">① 形状/地址固定（静态输入，或用 graph tree 管理多组）；② 捕获期间不能有 CPU 同步、不能动态分配（需用 graph 专用内存池）；③ 不能有依赖 CPU 值的控制流；④ 部分库调用/集合通信需要特定支持。<br>
+  <b>收益：</b>消除每步几十到上百次 launch 的 CPU 开销，小 batch decode 收益最大。</p>
+</details>
+
+<details><summary>23. Occupancy 越高越好吗？</summary>
+  <p class="a"><b>结论：</b>不一定。occupancy 用于掩盖延迟，但寄存器密集型 kernel（如 GEMM/FA）需要高寄存器复用，降低 occupancy 反而更快。<br>
+  <b>判断：</b>看 ncu 的 achieved occupancy 与 stall reasons；若瓶颈是 long scoreboard（访存等待），才需要更高 occupancy。<br>
+  <b>边界：</b>shared memory 用量也会限制 occupancy。</p>
+</details>
+
+<details><summary>24. Shared memory bank conflict 是什么？怎么缓解？</summary>
+  <p class="a"><b>结论：</b>同一 warp 的多个线程访问同一 bank 的不同地址时会串行化。32 个 bank，按 4 字节粒度。<br>
+  <b>缓解：</b>padding（如 <code>[32][33]</code>）、改变访问模式、使用 swizzle（CUTLASS 的 layout）、或改用 TMA。<br>
+  <b>检测：</b>ncu 的 shared memory bank conflict 计数器。</p>
+</details>
+
+<details><summary>25. TMA 相比 <code>cp.async</code> 的优势？</summary>
+  <p class="a"><b>结论：</b>TMA 是硬件多维拷贝引擎：不占寄存器、支持多维 tile 与自动边界处理、可与 mbarrier 异步同步，大幅降低地址计算与寄存器压力。<br>
+  <b>代价：</b>需要 tensor map 描述符，灵活性低于手工 load；对小/不规则访问未必更优。<br>
+  <b>配套：</b>通常与 warp specialization、多 stage 流水线一起用。</p>
+</details>
+
+<details><summary>26. 什么是 MFU？给一个训练 step 算一遍。</summary>
+  <p class="a"><b>结论：</b><code>MFU = 6ND / (t × peak)</code>，N 为参数量、D 为该 step 的 token 数、t 为 step 时间。<br>
+  <b>例：</b>N=7e9、D=4e6，8×H100 bf16 峰值 8×990e12=7.92e15 FLOPS。理论耗时 = 6×7e9×4e6 / 7.92e15 ≈ 21.2s；若实测 50s，则 MFU ≈ 42%。<br>
+  <b>含义：</b>MFU 低说明有通信、重算、数据或 bubble 损失；35–55% 属于良好。<br>
+  <b>边界：</b>不同硬件的 peak 定义不同（是否含 sparsity），比较时必须统一。</p>
+</details>
+
+<details><summary>27. Activation checkpointing 的显存/计算权衡？</summary>
+  <p class="a"><b>结论：</b>全量 checkpoint 把激活显存从 O(L) 降到 O(√L)（按层分组），代价是反向多一次前向，约 +33% 计算。<br>
+  <b>选择性：</b>只对 attention/大激活重算，性价比最高。<br>
+  <b>边界：</b>重算会改变数值（非确定性 op），需要时可开确定性模式。</p>
+</details>
+
+<details><summary>28. 训练吞吐突然下降 20%，你的排查顺序？</summary>
+  <p class="a">① 确认基线（commit/驱动/数据分布）→ ② nsys 看是否有 launch gap 或通信等待 → ③ <code>TORCH_LOGS</code> 看 graph break/recompile → ④ ncu 抽查热点 kernel 是否退化 → ⑤ 检查 dataloader 与 CPU 利用率 → ⑥ 检查是否有隐式同步/动态 shape → ⑦ 检查 NCCL 拓扑与 bucket 配置 → ⑧ 检查显存压力是否触发 allocator 抖动。<br>
+  <b>原则：</b>先分层排除，再深入；每步留证据。</p>
+</details>
+
+<details><summary>29. NCCL hang 的排查顺序？</summary>
+  <p class="a">① <code>TORCH_DISTRIBUTED_DEBUG=DETAIL</code> 确认哪个 rank 未参与 → ② <code>NCCL_DEBUG=INFO</code> 看建链与算法选择 → ③ FlightRecorder / <code>TORCH_NCCL_DUMP_ON_TIMEOUT</code> 拿集合通信调用栈 → ④ <code>py-spy dump</code> 看 Python 侧是否卡在别处（如 dataloader）→ ⑤ 检查是否有 rank 因异常提前退出 → ⑥ 检查网络/IB 与 GPU 健康。<br>
+  <b>常见根因：</b>某 rank 的 tensor shape 不一致、条件分支导致集合通信次数不同、未使用参数、异常被吞掉。</p>
+</details>
+
+<details><summary>30. 确定性训练要开哪些开关？代价是什么？</summary>
+  <p class="a"><b>开关：</b><code>torch.use_deterministic_algorithms(True)</code>、<code>CUBLAS_WORKSPACE_CONFIG=:4096:8</code>、<code>NCCL_DETERMINISTIC=1</code>、固定 seed、禁用非确定性 kernel（atomic 求和需改为确定性实现）。<br>
+  <b>代价：</b>部分 kernel 变慢、NCCL 算法受限、可能无法使用某些高性能实现。<br>
+  <b>建议：</b>调试期开启，生产训练通常关闭并依赖统计监控。</p>
+</details>
+
+<details><summary>31. 在 PyTorch 里加一个新算子，需要改哪些地方？</summary>
+  <p class="a">① 在 <code>native_functions.yaml</code> 声明 schema 与 dispatch；② 写 C++/CUDA kernel（结构化 kernel 更好）；③ 加 meta/fake 实现（shape 传播）；④ 在 <code>derivatives.yaml</code> 或 <code>torch.library</code> 定义 autograd；⑤ 加 decomposition（给 Inductor）；⑥ 加 Inductor lowering（若不希望 fallback）；⑦ 写测试（correctness、gradcheck、device generic）；⑧ 更新文档与 BC 说明。<br>
+  <b>现代替代：</b><code>torch.library.custom_op</code> + <code>register_fake</code> + <code>register_autograd</code>，适合外部扩展。</p>
+</details>
+
+<details><summary>32. AOTI 为什么能显著降低冷启动？</summary>
+  <p class="a"><b>结论：</b>它在编译期完成图捕获、lowering、kernel 编译与权重打包，运行时只加载 <code>.so</code> 与权重，不需要 Python、不需要 Dynamo、不需要 autotune 搜索。<br>
+  <b>对比：</b><code>torch.compile</code> 首次调用要跑完整编译链路（秒级到分钟级）。<br>
+  <b>边界：</b>动态 shape/控制流支持有限；模型变更需重新编译；适合稳定线上模型。</p>
+</details>
+
+<h2 id="anti">常见失败模式</h2>
+<table>
+  <tr><th>模式</th><th>表现</th><th>后果</th><th>解药</th></tr>
+  <tr><td>只读不跑</td><td>笔记很多，没有可运行代码</td><td>面试一问细节就露馅</td><td>每个阶段强制 lab + 数字</td></tr>
+  <tr><td>只跑不想</td><td>能跑 demo，不能解释为什么</td><td>遇到新问题束手无策</td><td>每个结论写「证据 + 边界」</td></tr>
+  <tr><td>过早深入</td><td>第一周读 <code>engine.cpp</code> 逐行</td><td>挫败、失去全局观</td><td>先建调用链，再按需深入</td></tr>
+  <tr><td>不做 profiling</td><td>凭直觉优化</td><td>优化无效甚至变慢</td><td>先测基线，再动手</td></tr>
+  <tr><td>追新不追本</td><td>追每个新框架</td><td>底层能力空洞</td><td>五层模型不变，框架只是表皮</td></tr>
+  <tr><td>收集癖</td><td>收藏 100 篇论文</td><td>没有产出</td><td>一进一出：读一篇写一段</td></tr>
+  <tr><td>单机思维</td><td>只在小卡上调优</td><td>结论不可迁移</td><td>明确硬件与版本，记录可复现条件</td></tr>
+  <tr><td>不做贡献</td><td>只消费不产出</td><td>缺少最强证据</td><td>阶段 1 后每周 2h 上游</td></tr>
+</table>
+
+<h2 id="progress">进度总览</h2>
+<div class="progress-card">
+  <span class="lbl">总进度</span>
+  <div class="bar"><i id="totalbar"></i></div>
+  <b id="totalpct">0%</b>
+  <b id="totalcnt" class="lbl">0 / 0</b>
+  <button class="reset" id="reset">重置</button>
+</div>
+<p class="mini">勾选状态保存在浏览器 localStorage，仅本机可见。打印时不含交互状态。</p>
+
+<h3>阶段完成度</h3>
+<table id="phaseTable">
+  <tr><th>阶段</th><th>完成</th><th style="width:40%">进度</th></tr>
+</table>
+
+<div class="callout info" style="margin-top:36px">
+  <b class="t">最后一句</b>
+  这份路线的终点不是「学完 PyTorch」，而是形成一套可迁移的方法：
+  <b>看到任何系统，都能拆成「数据怎么流、算力花在哪、通信有多少、失败怎么发现」四个问题</b>。
+  PyTorch 只是当前最好的练习场。做完北极大项目 + 10 个上游 PR，你就有资格去回答更难的问题了。
+</div>
+
+<p class="mini" style="margin-top:40px;border-top:1px solid var(--line);padding-top:14px">
+  基于本机 <code>pytorch/pytorch</code> 仓库（HEAD <code>5a98911762f</code>）整理 · 2026-11 · 路径已实测存在，函数名与设计可能随版本演进
+</p>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var KEY = 'pt-senior-roadmap-v1';
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.phase')).filter(function(c){
+    return c.querySelector('input[type=checkbox]');
+  });
+  var table = document.getElementById('phaseTable');
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { state = {}; }
+
+  function localBoxes(card){
+    return Array.prototype.slice.call(card.querySelectorAll('input[type=checkbox]'));
+  }
+  function pctOf(list){
+    if (!list.length) return 0;
+    return Math.round(list.filter(function(b){ return b.checked; }).length * 100 / list.length);
+  }
+  function doneOf(list){
+    return list.filter(function(b){ return b.checked; }).length;
+  }
+
+  // 先建表行，再统一由 render 填充，保证勾选后表格同步刷新
+  cards.forEach(function(card, i){
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-i', String(i));
+    tr.innerHTML = '<td><b>' + card.querySelector('.pnum').textContent + '</b> ' +
+      card.querySelector('.ph-head h3').textContent + '</td>' +
+      '<td class="cnt"></td>' +
+      '<td><div class="bar" style="height:8px"><i style="width:0"></i></div></td>';
+    table.appendChild(tr);
+  });
+
+  function render(){
+    var total = pctOf(boxes);
+    document.getElementById('totalbar').style.width = total + '%';
+    document.getElementById('totalpct').textContent = total + '%';
+    document.getElementById('totalcnt').textContent = doneOf(boxes) + ' / ' + boxes.length;
+
+    cards.forEach(function(card, i){
+      var local = localBoxes(card);
+      var tag = card.querySelector('[data-count]');
+      if (tag) {
+        tag.textContent = doneOf(local) + '/' + local.length + ' · ' + pctOf(local) + '%';
+      }
+      var row = table.querySelector('tr[data-i="' + i + '"]');
+      if (row) {
+        row.querySelector('.cnt').textContent = doneOf(local) + ' / ' + local.length;
+        row.querySelector('.bar > i').style.width = pctOf(local) + '%';
+      }
+    });
+  }
+
+  boxes.forEach(function(b){
+    b.checked = !!state[b.dataset.k];
+    b.addEventListener('change', function(){
+      state[b.dataset.k] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      render();
+    });
+  });
+
+  document.getElementById('reset').addEventListener('click', function(){
+    if (!confirm('清空所有勾选记录？')) return;
+    boxes.forEach(function(b){ b.checked = false; });
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    location.reload();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
